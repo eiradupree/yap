@@ -1,4 +1,4 @@
-module github.com/mattermost/mattermost-plugin-starter-template
+module github.com/eiradupree/yap
 
 go 1.26.10
 

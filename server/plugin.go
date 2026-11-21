@@ -11,10 +11,10 @@ import (
 	"github.com/mattermost/mattermost/server/public/pluginapi/cluster"
 	"github.com/pkg/errors"
 
-	"github.com/mattermost/mattermost-plugin-starter-template/server/api"
-	"github.com/mattermost/mattermost-plugin-starter-template/server/channelstatus"
-	"github.com/mattermost/mattermost-plugin-starter-template/server/command"
-	"github.com/mattermost/mattermost-plugin-starter-template/server/store/kvstore"
+	"github.com/eiradupree/yap/server/api"
+	"github.com/eiradupree/yap/server/channelstatus"
+	"github.com/eiradupree/yap/server/command"
+	"github.com/eiradupree/yap/server/store/kvstore"
 )
 
 // Plugin implements the interface expected by the Mattermost server to communicate between the server and plugin processes.

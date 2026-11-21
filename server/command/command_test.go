@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/mattermost/mattermost-plugin-starter-template/server/channelstatus"
-	"github.com/mattermost/mattermost-plugin-starter-template/server/store/kvstore/mocks"
+	"github.com/eiradupree/yap/server/channelstatus"
+	"github.com/eiradupree/yap/server/store/kvstore/mocks"
 )
 
 // The command's behavior is covered against a real server in TestChannelStatusEndpoint.

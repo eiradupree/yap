@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/mattermost/mattermost-plugin-starter-template/server/store/kvstore/mocks"
+	"github.com/eiradupree/yap/server/store/kvstore/mocks"
 )
 
 const (

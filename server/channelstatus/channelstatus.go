@@ -8,7 +8,7 @@ import (
 	"github.com/mattermost/mattermost/server/public/pluginapi"
 	"github.com/pkg/errors"
 
-	"github.com/mattermost/mattermost-plugin-starter-template/server/store/kvstore"
+	"github.com/eiradupree/yap/server/store/kvstore"
 )
 
 const (

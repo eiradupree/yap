@@ -9,7 +9,7 @@ import (
 	"github.com/mattermost/mattermost/server/public/pluginapi"
 	"github.com/pkg/errors"
 
-	"github.com/mattermost/mattermost-plugin-starter-template/server/channelstatus"
+	"github.com/eiradupree/yap/server/channelstatus"
 )
 
 type Command interface {
