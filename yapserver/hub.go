@@ -18,10 +18,14 @@ func NewHub() *Hub {
 	return &Hub{conns: make(map[int64]map[*client]struct{})}
 }
 
-func (h *Hub) add(userID int64) *client {
+// add registers a connection, or returns nil if the user already has max.
+func (h *Hub) add(userID int64, max int) *client {
 	c := &client{send: make(chan []byte, 64)}
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	if len(h.conns[userID]) >= max {
+		return nil
+	}
 	if h.conns[userID] == nil {
 		h.conns[userID] = make(map[*client]struct{})
 	}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -38,18 +39,54 @@ const (
 	maxHistory     = 200
 )
 
-type Server struct {
-	store         *Store
-	hub           *Hub
-	secureCookies bool
-	mux           *http.ServeMux
+const maxConnsPerUser = 10
+
+// Config holds the deployment settings that change server behavior.
+type Config struct {
+	// SecureCookies marks session cookies Secure. Turn on behind HTTPS.
+	SecureCookies bool
+	// BehindProxy trusts the last X-Forwarded-For entry as the client IP.
+	BehindProxy bool
+	// InviteCode, when set, is required to create an account.
+	InviteCode string
 }
 
-func NewServer(store *Store, secureCookies bool) *Server {
-	s := &Server{store: store, hub: NewHub(), secureCookies: secureCookies, mux: http.NewServeMux()}
+type Server struct {
+	store *Store
+	hub   *Hub
+	cfg   Config
+	mux   *http.ServeMux
+
+	authLimit    *limiter // login and register attempts per IP
+	postLimit    *limiter // messages per user
+	channelLimit *limiter // channel creations per user
+}
+
+func NewServer(store *Store, cfg Config) *Server {
+	s := &Server{
+		store:        store,
+		hub:          NewHub(),
+		cfg:          cfg,
+		mux:          http.NewServeMux(),
+		authLimit:    newLimiter(6*time.Second, 10),
+		postLimit:    newLimiter(500*time.Millisecond, 20),
+		channelLimit: newLimiter(30*time.Second, 5),
+	}
 
 	static, _ := fs.Sub(webFS, "web")
-	s.mux.Handle("GET /", http.FileServerFS(static))
+	files := http.FileServerFS(static)
+	s.mux.Handle("GET /", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Embedded files carry no modification time, so ask browsers to revalidate.
+		w.Header().Set("Cache-Control", "no-cache")
+		files.ServeHTTP(w, r)
+	}))
+	s.mux.HandleFunc("GET /api/config", func(w http.ResponseWriter, r *http.Request) {
+		signup := "open"
+		if s.cfg.InviteCode != "" {
+			signup = "invite"
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"signup": signup})
+	})
 
 	s.mux.HandleFunc("POST /api/register", s.handleRegister)
 	s.mux.HandleFunc("POST /api/login", s.handleLogin)
@@ -123,11 +160,27 @@ func (s *Server) auth(next func(http.ResponseWriter, *http.Request, User)) http.
 type credentials struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+	Invite   string `json:"invite,omitempty"`
+}
+
+func (s *Server) allowAuthAttempt(w http.ResponseWriter, r *http.Request) bool {
+	if !s.authLimit.allow(clientIP(r, s.cfg.BehindProxy)) {
+		writeError(w, http.StatusTooManyRequests, "too many attempts, try again in a minute")
+		return false
+	}
+	return true
 }
 
 func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
+	if !s.allowAuthAttempt(w, r) {
+		return
+	}
 	var c credentials
 	if !readJSON(w, r, &c) {
+		return
+	}
+	if s.cfg.InviteCode != "" && subtle.ConstantTimeCompare([]byte(c.Invite), []byte(s.cfg.InviteCode)) != 1 {
+		writeError(w, http.StatusForbidden, "a valid invite code is required")
 		return
 	}
 	if !usernameRe.MatchString(c.Username) {
@@ -150,6 +203,9 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	if !s.allowAuthAttempt(w, r) {
+		return
+	}
 	var c credentials
 	if !readJSON(w, r, &c) {
 		return
@@ -181,7 +237,7 @@ func (s *Server) startSession(w http.ResponseWriter, r *http.Request, u User, st
 		Path:     "/",
 		MaxAge:   int(sessionMaxAge.Seconds()),
 		HttpOnly: true,
-		Secure:   s.secureCookies || r.TLS != nil,
+		Secure:   s.cfg.SecureCookies || r.TLS != nil,
 		SameSite: http.SameSiteLaxMode,
 	})
 	writeJSON(w, status, u)
@@ -212,6 +268,10 @@ func (s *Server) handleListChannels(w http.ResponseWriter, r *http.Request, u Us
 }
 
 func (s *Server) handleCreateChannel(w http.ResponseWriter, r *http.Request, u User) {
+	if !s.channelLimit.allow(strconv.FormatInt(u.ID, 10)) {
+		writeError(w, http.StatusTooManyRequests, "you're creating channels too quickly")
+		return
+	}
 	var req struct {
 		Name string `json:"name"`
 	}
@@ -283,6 +343,10 @@ func (s *Server) handlePostMessage(w http.ResponseWriter, r *http.Request, u Use
 	if !ok {
 		return
 	}
+	if !s.postLimit.allow(strconv.FormatInt(u.ID, 10)) {
+		writeError(w, http.StatusTooManyRequests, "you're sending messages too quickly")
+		return
+	}
 	var req struct {
 		Body string `json:"body"`
 	}
@@ -326,13 +390,17 @@ func (s *Server) broadcastAll(e event) {
 
 func (s *Server) handleWS(w http.ResponseWriter, r *http.Request, u User) {
 	// Accept rejects cross-origin handshakes by default.
+	c := s.hub.add(u.ID, maxConnsPerUser)
+	if c == nil {
+		writeError(w, http.StatusTooManyRequests, "too many open connections")
+		return
+	}
+	defer s.hub.remove(u.ID, c)
 	conn, err := websocket.Accept(w, r, nil)
 	if err != nil {
 		return
 	}
 	defer conn.CloseNow()
-	c := s.hub.add(u.ID)
-	defer s.hub.remove(u.ID, c)
 
 	// The client never sends anything we act on; CloseRead handles pings and
 	// cancels ctx when the connection drops.

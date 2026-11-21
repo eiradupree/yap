@@ -28,7 +28,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ts := httptest.NewServer(NewServer(store, false))
+	ts := httptest.NewServer(NewServer(store, Config{}))
 	t.Cleanup(func() { ts.Close(); store.Close() })
 	return ts
 }
@@ -65,7 +65,7 @@ func (c *testClient) do(method, path string, body any, out any) int {
 func (c *testClient) register(name string) User {
 	c.t.Helper()
 	var u User
-	if code := c.do("POST", "/api/register", credentials{name, "correct-horse"}, &u); code != http.StatusCreated {
+	if code := c.do("POST", "/api/register", credentials{Username: name, Password: "correct-horse"}, &u); code != http.StatusCreated {
 		c.t.Fatalf("register %s: status %d", name, code)
 	}
 	return u
@@ -88,24 +88,24 @@ func TestRegisterLoginLogout(t *testing.T) {
 	a := newClient(t, ts)
 	a.register("alice")
 
-	if code := newClient(t, ts).do("POST", "/api/register", credentials{"ALICE", "correct-horse"}, nil); code != http.StatusConflict {
+	if code := newClient(t, ts).do("POST", "/api/register", credentials{Username: "ALICE", Password: "correct-horse"}, nil); code != http.StatusConflict {
 		t.Errorf("duplicate username (case-insensitive): got %d, want 409", code)
 	}
-	if code := newClient(t, ts).do("POST", "/api/register", credentials{"bob", "short"}, nil); code != http.StatusBadRequest {
+	if code := newClient(t, ts).do("POST", "/api/register", credentials{Username: "bob", Password: "short"}, nil); code != http.StatusBadRequest {
 		t.Errorf("short password: got %d, want 400", code)
 	}
-	if code := newClient(t, ts).do("POST", "/api/register", credentials{"<script>", "correct-horse"}, nil); code != http.StatusBadRequest {
+	if code := newClient(t, ts).do("POST", "/api/register", credentials{Username: "<script>", Password: "correct-horse"}, nil); code != http.StatusBadRequest {
 		t.Errorf("bad username: got %d, want 400", code)
 	}
 
 	b := newClient(t, ts)
-	if code := b.do("POST", "/api/login", credentials{"alice", "wrong-password"}, nil); code != http.StatusUnauthorized {
+	if code := b.do("POST", "/api/login", credentials{Username: "alice", Password: "wrong-password"}, nil); code != http.StatusUnauthorized {
 		t.Errorf("wrong password: got %d, want 401", code)
 	}
-	if code := b.do("POST", "/api/login", credentials{"nobody", "whatever-pw"}, nil); code != http.StatusUnauthorized {
+	if code := b.do("POST", "/api/login", credentials{Username: "nobody", Password: "whatever-pw"}, nil); code != http.StatusUnauthorized {
 		t.Errorf("unknown user: got %d, want 401", code)
 	}
-	if code := b.do("POST", "/api/login", credentials{"alice", "correct-horse"}, nil); code != http.StatusOK {
+	if code := b.do("POST", "/api/login", credentials{Username: "alice", Password: "correct-horse"}, nil); code != http.StatusOK {
 		t.Fatalf("login: got %d", code)
 	}
 	var me User
@@ -271,5 +271,93 @@ func TestLiveDelivery(t *testing.T) {
 
 	if _, _, err := websocket.Dial(ctx, wsURL, nil); err == nil {
 		t.Error("websocket without session should be refused")
+	}
+}
+
+func TestInviteCode(t *testing.T) {
+	store, err := OpenStore(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(NewServer(store, Config{InviteCode: "let-me-in"}))
+	t.Cleanup(func() { ts.Close(); store.Close() })
+
+	c := newClient(t, ts)
+	var cfg map[string]string
+	c.do("GET", "/api/config", nil, &cfg)
+	if cfg["signup"] != "invite" {
+		t.Errorf("config signup = %q, want invite", cfg["signup"])
+	}
+	if code := c.do("POST", "/api/register", credentials{Username: "alice", Password: "correct-horse"}, nil); code != http.StatusForbidden {
+		t.Errorf("no invite: got %d, want 403", code)
+	}
+	if code := c.do("POST", "/api/register", credentials{Username: "alice", Password: "correct-horse", Invite: "wrong"}, nil); code != http.StatusForbidden {
+		t.Errorf("wrong invite: got %d, want 403", code)
+	}
+	if code := c.do("POST", "/api/register", credentials{Username: "alice", Password: "correct-horse", Invite: "let-me-in"}, nil); code != http.StatusCreated {
+		t.Errorf("right invite: got %d, want 201", code)
+	}
+}
+
+func TestLoginRateLimit(t *testing.T) {
+	ts := newTestServer(t)
+	c := newClient(t, ts)
+	limited := false
+	for range 15 {
+		if c.do("POST", "/api/login", credentials{Username: "alice", Password: "guess-guess"}, nil) == http.StatusTooManyRequests {
+			limited = true
+			break
+		}
+	}
+	if !limited {
+		t.Error("15 rapid login attempts were never rate limited")
+	}
+}
+
+func TestPostRateLimit(t *testing.T) {
+	ts := newTestServer(t)
+	a := newClient(t, ts)
+	a.register("alice")
+	path := fmt.Sprintf("/api/channels/%d/messages", generalID(t, a))
+	limited := false
+	for range 40 {
+		if a.do("POST", path, map[string]string{"body": "spam"}, nil) == http.StatusTooManyRequests {
+			limited = true
+			break
+		}
+	}
+	if !limited {
+		t.Error("40 rapid posts were never rate limited")
+	}
+}
+
+func TestClientIP(t *testing.T) {
+	r := httptest.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "10.0.0.5:1234"
+	r.Header.Set("X-Forwarded-For", "1.1.1.1, 203.0.113.7")
+	if got := clientIP(r, false); got != "10.0.0.5" {
+		t.Errorf("direct: got %s", got)
+	}
+	if got := clientIP(r, true); got != "203.0.113.7" {
+		t.Errorf("behind proxy: got %s, want the proxy-appended last entry", got)
+	}
+}
+
+func TestWebsocketConnectionCap(t *testing.T) {
+	ts := newTestServer(t)
+	a := newClient(t, ts)
+	a.register("alice")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http") + "/api/ws"
+	for i := range maxConnsPerUser {
+		conn, _, err := websocket.Dial(ctx, wsURL, &websocket.DialOptions{HTTPClient: a.http})
+		if err != nil {
+			t.Fatalf("conn %d: %v", i, err)
+		}
+		defer conn.CloseNow()
+	}
+	if _, _, err := websocket.Dial(ctx, wsURL, &websocket.DialOptions{HTTPClient: a.http}); err == nil {
+		t.Error("connection past the cap was accepted")
 	}
 }

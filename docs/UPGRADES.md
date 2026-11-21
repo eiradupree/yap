@@ -9,9 +9,9 @@ Goal: Yap runs on its own backend instead of Mattermost. The first version is in
 Needs:
 
 - **Desktop app**: `desktop/` only connects to Mattermost servers. Replace it with a small Electron app that asks for a Yap server URL, checks `GET /api/ping`, and opens the server's web client.
-- **Hosting**: a host, a domain and HTTPS (for example Caddy as a reverse proxy) with `-secure-cookies` on, plus backups of `yap.db`.
+- **Hosting**: set up for Fly.io (see [yapserver/DEPLOY.md](../yapserver/DEPLOY.md)). Still to do: a custom domain and off-site backups (for example Litestream).
 - **Features**: direct messages, private channels, editing and deleting messages, file uploads, notifications, password reset, admin roles.
-- **Abuse protection**: rate limits on login and registration, and a way to close sign-ups or require invites.
+- **Abuse protection**: rate limits and invite-only sign-up are done. Still needed: banning users, and rate limits that survive restarts.
 - **Open decision**: whether to keep the Mattermost plugin and desktop fork once the own server covers what's needed.
 
 ## Mobile app (planned, not started)

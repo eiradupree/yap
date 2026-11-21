@@ -31,6 +31,12 @@ async function api(method, path, body) {
 // ---- auth ----
 
 let registering = false;
+let inviteOnly = false;
+
+api('GET', '/api/config').then((cfg) => {
+  inviteOnly = cfg.signup === 'invite';
+  setAuthMode(registering);
+}).catch(() => {});
 
 function showAuth() {
   $('app').hidden = true;
@@ -44,6 +50,8 @@ function setAuthMode(reg) {
   $('auth-submit').textContent = reg ? 'Create account' : 'Sign in';
   $('auth-toggle').textContent = reg ? 'Have an account? Sign in' : 'Need an account? Create one';
   $('password').autocomplete = reg ? 'new-password' : 'current-password';
+  $('invite-row').hidden = !(reg && inviteOnly);
+  $('invite').required = reg && inviteOnly;
   $('auth-error').textContent = '';
 }
 
@@ -53,10 +61,9 @@ $('auth-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   $('auth-error').textContent = '';
   try {
-    state.me = await api('POST', registering ? '/api/register' : '/api/login', {
-      username: $('username').value.trim(),
-      password: $('password').value,
-    });
+    const creds = { username: $('username').value.trim(), password: $('password').value };
+    if (registering && inviteOnly) creds.invite = $('invite').value.trim();
+    state.me = await api('POST', registering ? '/api/register' : '/api/login', creds);
     $('password').value = '';
     await startApp();
   } catch (err) {

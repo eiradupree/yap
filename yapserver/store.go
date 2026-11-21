@@ -81,12 +81,14 @@ CREATE TABLE IF NOT EXISTS messages (
 	created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS messages_channel ON messages(channel_id, id);
+CREATE INDEX IF NOT EXISTS members_user ON members(user_id);
+CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires_at);
 INSERT OR IGNORE INTO channels (name, created_at) VALUES ('general', unixepoch() * 1000);
 `
 
 func OpenStore(path string) (*Store, error) {
 	// _pragma applies to every pooled connection, not just the first.
-	dsn := "file:" + path + "?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
+	dsn := "file:" + path + "?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err

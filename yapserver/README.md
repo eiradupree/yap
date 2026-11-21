@@ -2,7 +2,7 @@
 
 `yapserver` is Yap's own chat server. It doesn't need Mattermost. It's a single Go program that stores everything in one SQLite file and serves its own web client.
 
-Status: MVP, running locally only.
+Status: MVP. See [DEPLOY.md](DEPLOY.md) to run it publicly on Fly.io, including measured capacity.
 
 ## Features
 
@@ -10,6 +10,7 @@ Status: MVP, running locally only.
 - Channels: everyone starts in `#general`. Anyone can create, join or leave public channels.
 - Message history with paging, plus live updates over a websocket.
 - Read and post permissions are checked on the server: you only see and post in channels you've joined.
+- Optional invite-only sign-up, rate limits on sign-in, sign-up, posting and channel creation, and a cap of 10 live connections per user.
 - The web client (`web/`) is plain HTML, CSS and JavaScript, built into the binary. It has light and dark themes and works on phone-sized screens.
 
 ## Run
@@ -24,11 +25,15 @@ go build -o yapserver .
 
 Open <http://localhost:8080> and create an account.
 
-| Flag | Default | Meaning |
-| --- | --- | --- |
-| `-addr` | `:8080` | Address to listen on |
-| `-db` | `yap.db` | SQLite database file, created if missing |
-| `-secure-cookies` | `false` | Mark session cookies `Secure`. Set it when serving over HTTPS. |
+| Flag | Env var | Default | Meaning |
+| --- | --- | --- | --- |
+| `-addr` | `PORT` | `:8080` | Address to listen on |
+| `-db` | `YAP_DB` | `yap.db` | SQLite database file, created if missing |
+| `-secure-cookies` | `YAP_SECURE_COOKIES` | `false` | Mark session cookies `Secure`. Set it when serving over HTTPS. |
+| `-behind-proxy` | `YAP_BEHIND_PROXY` | `false` | Take the client IP from the last `X-Forwarded-For` entry. Set it only behind a reverse proxy. |
+| | `YAP_INVITE_CODE` | unset | When set, creating an account requires this code |
+
+Or with Docker: `docker build -t yapserver . && docker run -p 8080:8080 -v yap-data:/data yapserver`.
 
 To back up, copy `yap.db` together with any `yap.db-wal` and `yap.db-shm` files while the server is stopped.
 
@@ -44,6 +49,7 @@ go test -race ./...
 - `main.go`: flags, startup, graceful shutdown, hourly cleanup of expired sessions
 - `store.go`: SQLite schema and queries
 - `server.go`: HTTP API, authentication, CSRF checks, websocket endpoint
+- `ratelimit.go`: per-IP and per-user rate limits, client IP handling
 - `hub.go`: fans live events out to connected clients
 - `web/`: the web client
 
@@ -54,7 +60,8 @@ All request and response bodies are JSON. Every POST must send `Content-Type: ap
 | Method and path | Auth | Description |
 | --- | --- | --- |
 | `GET /api/ping` | none | Health check: `{"status":"ok","app":"yap"}` |
-| `POST /api/register` | none | `{username, password}`: creates the account and signs in |
+| `GET /api/config` | none | `{"signup":"open"}` or `{"signup":"invite"}` |
+| `POST /api/register` | none | `{username, password, invite?}`: creates the account and signs in |
 | `POST /api/login` | none | `{username, password}`: signs in |
 | `POST /api/logout` | session | Ends the current session |
 | `GET /api/me` | session | Current user |
@@ -71,6 +78,6 @@ Rules: usernames are 3 to 32 characters (letters, digits, `.`, `_`, `-`) and cas
 ## Not built yet
 
 - **Desktop app**: `desktop/` is still the Mattermost-based app, and its Connect screen only accepts Mattermost servers. It needs a small replacement app that opens a Yap server.
-- **Hosting**: the server only runs locally so far. Making it reachable needs a host, a domain and HTTPS (for example a reverse proxy such as Caddy in front of it), with `-secure-cookies` turned on.
 - **Features**: direct messages, private channels, editing and deleting messages, file uploads, notifications, password reset, admin roles.
-- **Abuse protection**: there's no rate limit on login or registration, and anyone who can reach the server can create an account.
+- **Abuse protection**: rate limits are in memory, so they reset on restart. There's no account lockout, and no way to ban a user yet.
+- **Scaling past one machine**: needs Postgres instead of SQLite (see [DEPLOY.md](DEPLOY.md)).
