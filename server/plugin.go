@@ -1,0 +1,103 @@
+package main
+
+import (
+	"net/http"
+	"sync"
+	"time"
+
+	"github.com/mattermost/mattermost/server/public/model"
+	"github.com/mattermost/mattermost/server/public/plugin"
+	"github.com/mattermost/mattermost/server/public/pluginapi"
+	"github.com/mattermost/mattermost/server/public/pluginapi/cluster"
+	"github.com/pkg/errors"
+
+	"github.com/mattermost/mattermost-plugin-starter-template/server/api"
+	"github.com/mattermost/mattermost-plugin-starter-template/server/channelstatus"
+	"github.com/mattermost/mattermost-plugin-starter-template/server/command"
+	"github.com/mattermost/mattermost-plugin-starter-template/server/store/kvstore"
+)
+
+// Plugin implements the interface expected by the Mattermost server to communicate between the server and plugin processes.
+type Plugin struct {
+	plugin.MattermostPlugin
+
+	// kvstore is the client used to read/write KV records for this plugin.
+	kvstore kvstore.KVStore
+
+	// statuses reads and changes channel statuses for the slash command and the HTTP API.
+	statuses *channelstatus.Service
+
+	// client is the Mattermost server API client.
+	client *pluginapi.Client
+
+	// commandClient is the client used to register and execute slash commands.
+	commandClient command.Command
+
+	// httpHandler serves the routes in server/api.
+	httpHandler *api.Handler
+
+	backgroundJob *cluster.Job
+
+	// configurationLock synchronizes access to the configuration.
+	configurationLock sync.RWMutex
+
+	// configuration is the active plugin configuration. Consult getConfiguration and
+	// setConfiguration for usage.
+	configuration *configuration
+}
+
+// OnActivate is invoked when the plugin is activated. If an error is returned, the plugin will be deactivated.
+func (p *Plugin) OnActivate() error {
+	p.client = pluginapi.NewClient(p.API, p.Driver)
+
+	p.kvstore = kvstore.NewKVStore(p.client)
+	p.statuses = channelstatus.NewService(p.API, p.client, p.kvstore)
+
+	commandClient, err := command.NewCommandHandler(p.client, p.statuses)
+	if err != nil {
+		return err
+	}
+	p.commandClient = commandClient
+
+	p.httpHandler = api.NewHandler(p.API, p.statuses, func() string { return p.getConfiguration().WebhookSecret })
+
+	job, err := cluster.Schedule(
+		p.API,
+		"BackgroundJob",
+		cluster.MakeWaitForRoundedInterval(1*time.Hour),
+		p.runJob,
+	)
+	if err != nil {
+		return errors.Wrap(err, "failed to schedule background job")
+	}
+
+	p.backgroundJob = job
+
+	return nil
+}
+
+// OnDeactivate is invoked when the plugin is deactivated.
+func (p *Plugin) OnDeactivate() error {
+	if p.backgroundJob != nil {
+		if err := p.backgroundJob.Close(); err != nil {
+			p.API.LogError("Failed to close background job", "err", err)
+		}
+	}
+	return nil
+}
+
+// ServeHTTP is invoked for requests to /plugins/{plugin_id}.
+func (p *Plugin) ServeHTTP(c *plugin.Context, w http.ResponseWriter, r *http.Request) {
+	p.httpHandler.ServeHTTP(c, w, r)
+}
+
+// This will execute the commands that were registered in the NewCommandHandler function.
+func (p *Plugin) ExecuteCommand(c *plugin.Context, args *model.CommandArgs) (*model.CommandResponse, *model.AppError) {
+	response, err := p.commandClient.Handle(c, args)
+	if err != nil {
+		return nil, model.NewAppError("ExecuteCommand", "plugin.command.execute_command.app_error", nil, err.Error(), http.StatusInternalServerError)
+	}
+	return response, nil
+}
+
+// See https://developers.mattermost.com/extend/plugins/server/reference/
