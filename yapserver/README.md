@@ -2,7 +2,7 @@
 
 `yapserver` is Yap's own chat server. It doesn't need Mattermost. It's a single Go program that stores everything in one SQLite file and serves its own web client.
 
-Status: MVP. See [DEPLOY.md](DEPLOY.md) to run it publicly on Fly.io, including measured capacity.
+Status: MVP, live at <https://yap-chat-712e13.fly.dev> (invite-only). See [DEPLOY.md](DEPLOY.md) for deploying and operating it, including measured capacity.
 
 ## Features
 

@@ -1,6 +1,6 @@
 # Fly.io deployment for the Yap server. See yapserver/DEPLOY.md.
 # `app` is set when the app is created; change it if you fork this.
-app = "APP_NAME"
+app = "yap-chat-712e13"
 primary_region = "ord"
 
 [build]

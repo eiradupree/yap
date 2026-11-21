@@ -111,6 +111,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Referrer-Policy", "same-origin")
 	w.Header().Set("Content-Security-Policy",
 		"default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data:; frame-ancestors 'none'")
+	if s.cfg.SecureCookies {
+		// Served over HTTPS: tell browsers never to use plain HTTP for this site.
+		w.Header().Set("Strict-Transport-Security", "max-age=31536000")
+	}
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		if !sameOrigin(r) {
 			writeError(w, http.StatusForbidden, "cross-origin request refused")
