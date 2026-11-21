@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+    <rect width="32" height="32" rx="4" fill="#7C3AED"/>
+    <g transform="translate(4 3.6) scale(0.1)">
+        <path fill="#FFFFFF" fill-rule="evenodd" d="M40 32h160a24 24 0 0 1 24 24v96a24 24 0 0 1-24 24H104l-48 40v-40H40a24 24 0 0 1-24-24V56a24 24 0 0 1 24-24z M60 104a16 16 0 1 0 32 0a16 16 0 1 0-32 0zM104 104a16 16 0 1 0 32 0a16 16 0 1 0-32 0zM148 104a16 16 0 1 0 32 0a16 16 0 1 0-32 0z"/>
+    </g>
+</svg>

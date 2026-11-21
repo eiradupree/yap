@@ -1,3 +1,14 @@
+Yap Desktop
+
+Yap Desktop is a modified version of Mattermost Desktop v6.3.2
+(https://github.com/mattermost/desktop), redistributed under the Apache License 2.0.
+See MODIFICATIONS.md for the changes made for Yap.
+
+Yap is not affiliated with, sponsored by or endorsed by Mattermost, Inc.
+Mattermost is a trademark of Mattermost, Inc.
+
+================================================================================
+
 Mattermost Desktop
 
 © 2016-2017 Mattermost, Inc.  All Rights Reserved.  See LICENSE.txt for license information.

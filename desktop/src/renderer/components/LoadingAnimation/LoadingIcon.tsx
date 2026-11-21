@@ -5,6 +5,7 @@ import React from 'react';
 
 /**
  * A function component for inlining SVG code for animation logo loader
+ * Modified for Yap: draws the Yap bubble instead of the Mattermost compass logo.
  */
 function LoadingAnimation() {
     return (
@@ -54,7 +55,7 @@ function LoadingAnimation() {
                         />
                     </g>
                 </mask>
-                <mask id='LoadingAnimation__base-mask'>
+                <mask id='LoadingAnimation__bubble-dots-mask'>
                     <rect
                         x='0'
                         y='0'
@@ -62,31 +63,11 @@ function LoadingAnimation() {
                         height='104'
                         fill='white'
                     />
-                    <circle
-                        r='37'
-                        cx='54'
-                        cy='46'
-                        fill='black'
-                    />
-                    <g className='LoadingAnimation__compass-needle-behind-mask'>
-                        <g transform='translate(54,46)'>
-                            <g transform='translate(-29, -61.3)'>
-                                <path
-                                    d='M38.5984 0C45.476 1.07762 51.9794 3.28918 57.9108 6.43722V61.1566C57.9108 77.1373 44.9364 90.1119 28.9554 90.1119C12.9744 90.1119 0 77.1373 0 61.1566C0 55.3848 1.69443 50.0063 4.60763 45.4861L38.5984 0Z'
-                                    fill='black'
-                                />
-                            </g>
-                        </g>
-                    </g>
-                    <g className='LoadingAnimation__compass-needle-front-mask'>
-                        <g transform='translate(54,46)'>
-                            <g transform='translate(-29,-61.3)'>
-                                <path
-                                    d='M38.5984 0C45.476 1.07762 51.9794 3.28918 57.9108 6.43722V61.1566C57.9108 77.1373 44.9364 90.1119 28.9554 90.1119C12.9744 90.1119 0 77.1373 0 61.1566C0 55.3848 1.69443 50.0063 4.60763 45.4861L38.5984 0Z'
-                                    fill='black'
-                                />
-                            </g>
-                        </g>
+                    <g transform='translate(4 2.4) scale(0.4)'>
+                        <path
+                            d='M60 104a16 16 0 1 0 32 0a16 16 0 1 0-32 0zM104 104a16 16 0 1 0 32 0a16 16 0 1 0-32 0zM148 104a16 16 0 1 0 32 0a16 16 0 1 0-32 0z'
+                            fill='black'
+                        />
                     </g>
                 </mask>
                 <mask id='LoadingAnimation__spinner-left-half-mask'>
@@ -147,26 +128,19 @@ function LoadingAnimation() {
                     className='LoadingAnimation__compass-base-container'
                     mask='url(#LoadingAnimation__base-wipe-mask)'
                 >
-                    <circle
+                    <g
                         className='LoadingAnimation__compass-base'
-                        r='52'
-                        cx='52'
-                        cy='52'
-                        fill='currentColor'
-                        mask='url(#LoadingAnimation__base-mask)'
-                    />
+                        mask='url(#LoadingAnimation__bubble-dots-mask)'
+                    >
+                        <path
+                            transform='translate(4 2.4) scale(0.4)'
+                            d='M40 32h160a24 24 0 0 1 24 24v96a24 24 0 0 1-24 24H104l-48 40v-40H40a24 24 0 0 1-24-24V56a24 24 0 0 1 24-24z'
+                            fill='currentColor'
+                        />
+                    </g>
                 </g>
                 <g className='LoadingAnimation__compass-needle-container'>
-                    <g className='LoadingAnimation__compass-needle'>
-                        <g transform='translate(54,46)'>
-                            <g transform='translate(-15,-42)'>
-                                <path
-                                    d='M29.9539 1.4977C29.9539 0.670968 29.2827 0 28.4562 0C27.9597 0 27.5192 0.242028 27.2468 0.614415C27.216 0.656555 27.1873 0.700359 27.1609 0.745666L3.66519 32.1191C1.38202 34.7479 0 38.1803 0 41.9355C0 50.207 6.70541 56.9124 14.977 56.9124C23.2485 56.9124 29.9539 50.207 29.9539 41.9355L29.9539 41.9013V1.50252C29.9539 1.50091 29.9539 1.49931 29.9539 1.4977Z'
-                                    fill='currentColor'
-                                />
-                            </g>
-                        </g>
-                    </g>
+                    <g className='LoadingAnimation__compass-needle'/>
                 </g>
             </g>
         </svg>

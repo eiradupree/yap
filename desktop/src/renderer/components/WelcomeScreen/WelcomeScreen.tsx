@@ -45,7 +45,7 @@ function WelcomeScreen({
             subtitle: (
                 <FormattedMessage
                     id='renderer.components.welcomeScreen.slides.welcome.subtitle'
-                    defaultMessage='Mattermost is a sovereign collaboration platform built for operational environments and uncompromising security.'
+                    defaultMessage='Yap is an open-source, Slack-like workspace for your team, built on Mattermost.'
                 />
             ),
             image: (

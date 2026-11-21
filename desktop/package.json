@@ -1,19 +1,20 @@
 {
-  "name": "mattermost-desktop",
-  "productName": "Mattermost",
+  "name": "yap-desktop",
+  "productName": "Yap",
   "version": "6.3.2",
-  "description": "Mattermost",
+  "description": "Yap desktop app",
   "main": "dist/index.js",
-  "author": "Mattermost, Inc. <feedback@mattermost.com>",
+  "author": "Yap contributors (based on Mattermost Desktop by Mattermost, Inc.)",
   "license": "Apache-2.0",
-  "desktopName": "Mattermost.Desktop",
-  "homepage": "https://mattermost.com",
+  "desktopName": "com.eiradupree.yap.desktop",
+  "homepage": "https://github.com/eiradupree/yap",
   "engines": {
     "node": ">=24.0.0"
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/mattermost/desktop.git"
+    "url": "git+https://github.com/eiradupree/yap.git",
+    "directory": "desktop"
   },
   "scripts": {
     "postinstall": "patch-package && electron-builder install-app-deps",
@@ -56,7 +57,8 @@
     "package:linux:arch-arm64": "cross-env CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++ electron-builder --linux",
     "package:linux-tar": "npm run build-prod && npm run package:linux:arch-x64 -- tar.gz --x64 --publish=never && npm run package:linux:arch-arm64 -- tar.gz --arm64 --publish=never",
     "package:linux-pkg": "npm run build-prod && npm run package:linux:arch-x64 -- deb rpm flatpak --x64 --publish=never && npm run package:linux:arch-arm64 -- deb rpm flatpak --arm64 --publish=never",
-    "package:linux-appImage": "npm run build-prod && npm run package:linux:arch-x64 -- tar.gz appimage --x64 --publish=never && npm run package:linux:arch-arm64 -- tar.gz appimage --arm64 --publish=never"
+    "package:linux-appImage": "npm run build-prod && npm run package:linux:arch-x64 -- tar.gz appimage --x64 --publish=never && npm run package:linux:arch-arm64 -- tar.gz appimage --arm64 --publish=never",
+    "package:mac-local": "npm run build-prod && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --universal --publish=never -c.mac.hardenedRuntime=false -c.mac.gatekeeperAssess=false"
   },
   "jest": {
     "clearMocks": true,

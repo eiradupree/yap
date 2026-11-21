@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240">
+    <defs>
+        <mask id="cut">
+            <rect width="240" height="240" fill="#fff"/>
+            <circle cx="192" cy="188" r="62" fill="#000"/>
+        </mask>
+    </defs>
+    <path fill="GLYPH" fill-rule="evenodd" mask="url(#cut)" d="M40 32h160a24 24 0 0 1 24 24v96a24 24 0 0 1-24 24H104l-48 40v-40H40a24 24 0 0 1-24-24V56a24 24 0 0 1 24-24z M60 104a16 16 0 1 0 32 0a16 16 0 1 0-32 0zM104 104a16 16 0 1 0 32 0a16 16 0 1 0-32 0zM148 104a16 16 0 1 0 32 0a16 16 0 1 0-32 0z"/>
+    <circle cx="192" cy="188" r="46" fill="BADGE"/>
+</svg>

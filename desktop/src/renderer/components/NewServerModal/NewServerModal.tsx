@@ -508,7 +508,7 @@ class NewServerModal extends React.PureComponent<Props, State> {
                                         <small className='NewServerModal__toggle__description'>
                                             <FormattedMessage
                                                 id='renderer.components.newServerModal.permissions.notifications.mac'
-                                                defaultMessage='You may also need to enable notifications in macOS for Mattermost. Click <link>here</link> to open the System Preferences.'
+                                                defaultMessage='You may also need to enable notifications in macOS for Yap. Click <link>here</link> to open the System Preferences.'
                                                 values={notificationValues}
                                             />
                                         </small>
@@ -517,7 +517,7 @@ class NewServerModal extends React.PureComponent<Props, State> {
                                         <small className='NewServerModal__toggle__description'>
                                             <FormattedMessage
                                                 id='renderer.components.newServerModal.permissions.notifications.windows'
-                                                defaultMessage='You may also need to enable notifications in Windows for Mattermost. Click <link>here</link> to open the Notification Settings.'
+                                                defaultMessage='You may also need to enable notifications in Windows for Yap. Click <link>here</link> to open the Notification Settings.'
                                                 values={notificationValues}
                                             />
                                         </small>

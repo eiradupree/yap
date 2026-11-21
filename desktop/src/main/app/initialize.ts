@@ -231,7 +231,7 @@ function initializeBeforeAppReady() {
     AllowProtocolDialog.init();
 
     if (isDev && process.env.NODE_ENV !== 'test') {
-        app.setAsDefaultProtocolClient('mattermost-dev', process.execPath, [path.resolve(process.cwd(), 'dist/')]);
+        app.setAsDefaultProtocolClient('yap-dev', process.execPath, [path.resolve(process.cwd(), 'dist/')]);
     } else {
         app.setAsDefaultProtocolClient(MATTERMOST_PROTOCOL);
     }
@@ -330,7 +330,7 @@ async function initializeAfterAppReady() {
     ServerManager.init();
     ServerManager.off(SERVER_ADDED, PreAuthManager.loadPreAuthSecretForServer);
 
-    app.setAppUserModelId('Mattermost.Desktop'); // Use explicit AppUserModelID
+    app.setAppUserModelId('com.eiradupree.yap.desktop'); // Use explicit AppUserModelID
     const defaultSession = session.defaultSession;
     defaultSession.webRequest.onBeforeRequest(async (details, callback) => {
         try {

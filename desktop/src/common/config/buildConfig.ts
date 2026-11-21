@@ -34,7 +34,7 @@ const buildConfig: BuildConfig = {
     academyLink: DEFAULT_ACADEMY_LINK,
     upgradeLink: DEFAULT_UPGRADE_LINK,
     enableServerManagement: true,
-    enableUpdateNotifications: true,
+    enableUpdateNotifications: false, // Yap has no update feed yet; don't point users at Mattermost Desktop releases
     updateNotificationURL: 'https://releases.mattermost.com/desktop',
     macAppStoreUpdateURL: 'macappstore://apps.apple.com/us/app/mattermost-desktop/id1614666244',
     windowsStoreUpdateURL: 'ms-windows-store://pdp/?productid=XP8BR8MH3LPKLT',
@@ -42,7 +42,7 @@ const buildConfig: BuildConfig = {
     linuxGitHubReleaseURL: 'https://github.com/mattermost/desktop/releases/tag',
     managedResources: ['trusted'],
     allowedProtocols: [
-        'mattermost',
+        'yap',
         'ftp',
         'mailto',
         'tel',

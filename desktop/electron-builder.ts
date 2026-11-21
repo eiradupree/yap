@@ -1,8 +1,15 @@
 // Copyright (c) 2016-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
+const fs = require('fs');
+
 const semver = require('semver');
 
 const pkg = require('./package.json');
+
+// Modified for Yap: the communication-notifications entitlement is restricted and macOS kills
+// the app at launch unless a provisioning profile grants it, so builds without one
+// (local and ad-hoc signed builds) use entitlements that leave it out.
+const hasMacProvisioningProfile = fs.existsSync('./mac.provisionProfile');
 
 function getMacVersions() {
     const stableVersion = semver.coerce(pkg.version)?.version || pkg.version;
@@ -19,7 +26,7 @@ function getMacVersions() {
 }
 
 const config = {
-    appId: 'Mattermost.Desktop',
+    appId: 'com.eiradupree.yap.desktop',
     artifactName: '${version}/${name}-${version}-${os}-${arch}.${ext}',
     directories: {
         buildResources: 'src/assets',
@@ -59,9 +66,9 @@ const config = {
     ],
     protocols: [
         {
-            name: 'Mattermost',
+            name: 'Yap',
             schemes: [
-                'mattermost',
+                'yap',
             ],
         },
     ],
@@ -69,7 +76,7 @@ const config = {
     afterPack: 'scripts/afterpack.js',
     deb: {
         artifactName: '${version}/${name}_${version}-1_${arch}.${ext}',
-        synopsis: 'Mattermost Desktop App',
+        synopsis: 'Yap Desktop App',
         depends: [
             'libnotify4',
             'libxtst6',
@@ -93,7 +100,7 @@ const config = {
             'rpm',
             'flatpak',
         ],
-        appId: 'com.Mattermost.Desktop',
+        appId: 'com.eiradupree.yap.desktop',
         extraFiles: [
             {
                 filter: [
@@ -131,12 +138,12 @@ const config = {
         ],
         hardenedRuntime: true,
         gatekeeperAssess: true,
-        entitlements: './resources/mac/entitlements.mac.plist',
+        entitlements: hasMacProvisioningProfile ? './resources/mac/entitlements.mac.plist' : './resources/mac/entitlements.mac.local.plist',
         entitlementsInherit: './resources/mac/entitlements.mac.inherit.plist',
         extendInfo: {
             NSMicrophoneUsageDescription: 'Microphone access is used to capture audio for voice communication and recordings.',
             NSCameraUsageDescription: 'Camera access is used to capture video for video conferencing and recordings.',
-            NSFocusStatusUsageDescription: 'Focus status is used by Mattermost to determine whether to send notifications or not.',
+            NSFocusStatusUsageDescription: 'Focus status is used by Yap to determine whether to send notifications or not.',
             LSFileQuarantineEnabled: true,
         },
         x64ArchFiles: '**/node_modules/@koromix/koffi-darwin-*/darwin_*/koffi.node',
@@ -204,7 +211,7 @@ const config = {
     },
     msi: {
         additionalWixArgs: ['-ext', 'WixUtilExtension'],
-        upgradeCode: '{8523DAF0-699D-4CC7-9A65-C5E696A9DE6D}',
+        upgradeCode: '{B32347BC-B862-40F7-A31C-1BAB44511052}',
         perMachine: true,
     },
     rpm: {
