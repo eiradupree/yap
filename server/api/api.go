@@ -16,7 +16,7 @@ import (
 	"github.com/mattermost/mattermost/server/public/plugin"
 	"github.com/mattermost/mattermost/server/public/pluginapi/experimental/bot/logger"
 
-	"github.com/mattermost/mattermost-plugin-starter-template/server/channelstatus"
+	"github.com/eiradupree/yap/server/channelstatus"
 )
 
 // Handler routes the requests the server forwards to the plugin's ServeHTTP hook.
@@ -62,7 +62,7 @@ func (h *Handler) initRouter() *mux.Router {
 type pluginContextKey struct{}
 
 // ServeHTTP has the plugin hook's signature; the plugin's ServeHTTP passes its arguments straight through.
-// The root URL is currently <siteUrl>/plugins/com.mattermost.plugin-starter-template/api/v1/. Replace com.mattermost.plugin-starter-template with the plugin ID.
+// The root URL is currently <siteUrl>/plugins/com.eiradupree.yap/api/v1/. Replace com.eiradupree.yap with the plugin ID.
 func (h *Handler) ServeHTTP(c *plugin.Context, w http.ResponseWriter, r *http.Request) {
 	h.router.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), pluginContextKey{}, c)))
 }

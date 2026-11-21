@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="240" height="240" viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+    <title>Yap</title>
+    <path fill="#7C3AED" d="M40 32h160a24 24 0 0 1 24 24v96a24 24 0 0 1-24 24H104l-48 40v-40H40a24 24 0 0 1-24-24V56a24 24 0 0 1 24-24z"/>
+    <circle cx="76" cy="104" r="14" fill="#FFFFFF"/>
+    <circle cx="120" cy="104" r="14" fill="#FFFFFF"/>
+    <circle cx="164" cy="104" r="14" fill="#FFFFFF"/>
+</svg>
