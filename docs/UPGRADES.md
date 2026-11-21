@@ -2,6 +2,18 @@
 
 Planned work and open decisions for Yap, with what each one needs. Last updated 2026-11-20.
 
+## Own server (MVP, in progress)
+
+Goal: Yap runs on its own backend instead of Mattermost. The first version is in `yapserver/` (see [yapserver/README.md](../yapserver/README.md)). It provides accounts, public channels, message history and live updates, works locally and has tests.
+
+Needs:
+
+- **Desktop app**: `desktop/` only connects to Mattermost servers. Replace it with a small Electron app that asks for a Yap server URL, checks `GET /api/ping`, and opens the server's web client.
+- **Hosting**: a host, a domain and HTTPS (for example Caddy as a reverse proxy) with `-secure-cookies` on, plus backups of `yap.db`.
+- **Features**: direct messages, private channels, editing and deleting messages, file uploads, notifications, password reset, admin roles.
+- **Abuse protection**: rate limits on login and registration, and a way to close sign-ups or require invites.
+- **Open decision**: whether to keep the Mattermost plugin and desktop fork once the own server covers what's needed.
+
 ## Mobile app (planned, not started)
 
 Goal: a Yap-branded iOS and Android app, forked from [mattermost-mobile](https://github.com/mattermost/mattermost-mobile) (Apache-2.0, React Native) the same way `desktop/` was forked from Mattermost Desktop.

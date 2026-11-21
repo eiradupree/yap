@@ -12,6 +12,10 @@ Yap is in early development. It is based on the [Mattermost plugin starter templ
 - **Channel status sidebar**: click the tag, or the flag icon in the App Bar, to view or change the status. Changing it requires permission to edit the channel header.
 - **Webhook endpoint**: `POST <SiteURL>/plugins/com.eiradupree.yap/webhook` with an `X-Webhook-Secret` header. Generate the secret under System Console > Plugins > Yap.
 
+## Yap server (no Mattermost)
+
+`yapserver/` is Yap's own chat server, an alternative to running on Mattermost. It's a single Go program with accounts, channels, message history and live updates. It stores everything in one SQLite file and serves its own web client. It's an MVP that so far only runs locally. See [yapserver/README.md](yapserver/README.md) to run it and for what's still missing.
+
 ## Desktop app
 
 `desktop/` contains Yap Desktop, a native app for macOS that runs on both Intel and Apple silicon Macs. It is a modified version of the Apache-2.0 [Mattermost Desktop](https://github.com/mattermost/desktop) app. See [desktop/README.md](desktop/README.md) to build it.

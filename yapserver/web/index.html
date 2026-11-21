@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yap</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main id="auth" class="auth" hidden>
+    <form id="auth-form" class="card">
+      <h1>Yap</h1>
+      <p id="auth-sub" class="muted">Sign in to continue</p>
+      <label>Username <input id="username" name="username" autocomplete="username" required></label>
+      <label>Password <input id="password" name="password" type="password" autocomplete="current-password" required></label>
+      <p id="auth-error" class="error" role="alert"></p>
+      <button type="submit" id="auth-submit">Sign in</button>
+      <button type="button" id="auth-toggle" class="link">Need an account? Create one</button>
+    </form>
+  </main>
+
+  <div id="app" class="app" hidden>
+    <aside class="sidebar">
+      <header class="sidebar-head">
+        <strong>Yap</strong>
+        <button id="logout" class="link" type="button">Sign out</button>
+      </header>
+      <p id="me" class="muted me"></p>
+      <h2>Channels</h2>
+      <ul id="channels" class="channels"></ul>
+      <form id="new-channel" class="new-channel">
+        <input id="new-channel-name" placeholder="new-channel" maxlength="32" aria-label="New channel name">
+        <button type="submit" title="Create channel">+</button>
+      </form>
+    </aside>
+    <section class="chat">
+      <header class="chat-head">
+        <h1 id="channel-title"># </h1>
+        <span id="conn" class="conn" title="Live updates"></span>
+        <button id="leave" class="link" type="button">Leave</button>
+      </header>
+      <div id="join-banner" class="join-banner" hidden>
+        <p>You're not in this channel.</p>
+        <button id="join" type="button">Join channel</button>
+      </div>
+      <ol id="messages" class="messages" aria-live="polite"></ol>
+      <form id="composer" class="composer">
+        <textarea id="body" rows="1" placeholder="Message" maxlength="4000" aria-label="Message"></textarea>
+        <button type="submit">Send</button>
+      </form>
+    </section>
+  </div>
+</body>
+</html>
