@@ -12,7 +12,15 @@ Yap is in early development. It is based on the [Mattermost plugin starter templ
 - **Channel status sidebar**: click the tag, or the flag icon in the App Bar, to view or change the status. Changing it requires permission to edit the channel header.
 - **Webhook endpoint**: `POST <SiteURL>/plugins/com.eiradupree.yap/webhook` with an `X-Webhook-Secret` header. Generate the secret under System Console > Plugins > Yap.
 
-## Requirements
+## Desktop app
+
+`desktop/` contains Yap Desktop, a native app for macOS that runs on both Intel and Apple silicon Macs. It is a modified version of the Apache-2.0 [Mattermost Desktop](https://github.com/mattermost/desktop) app. See [desktop/README.md](desktop/README.md) to build it.
+
+## Roadmap
+
+Planned work (the mobile app, desktop signing and updates) and open decisions are tracked in [docs/UPGRADES.md](docs/UPGRADES.md).
+
+## Plugin requirements
 
 - Mattermost Server 11.7 or later (the oldest supported ESR)
 - Go (version in `go.mod`) and Node.js (version in `.nvmrc`) to build
