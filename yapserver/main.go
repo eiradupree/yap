@@ -61,6 +61,9 @@ func main() {
 				if err := store.DeleteExpiredSessions(ctx); err != nil {
 					log.Printf("clean sessions: %v", err)
 				}
+				if err := store.DeleteAbandonedUploads(ctx); err != nil {
+					log.Printf("clean uploads: %v", err)
+				}
 			}
 		}
 	}()
