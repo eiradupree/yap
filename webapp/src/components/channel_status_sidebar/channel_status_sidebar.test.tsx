@@ -66,6 +66,53 @@ test('shows load errors and retries', async () => {
     expect(await (await currentStatus()).findByText('On track')).toBeVisible();
 });
 
+// A load that stays in flight until the test finishes it. Requests are shared per channel
+// while in flight, so every test must finish the ones it starts.
+function slowLoad() {
+    let finish: (status: string) => void = () => {};
+    mockFetchChannelStatus.mockReturnValueOnce(new Promise((resolve) => {
+        finish = resolve;
+    }));
+    return async (status: string) => act(async () => finish(status));
+}
+
+test('hides the load error while retrying', async () => {
+    mockFetchChannelStatus.mockRejectedValueOnce(new Error('Failed to load the channel status'));
+    const finishRetry = slowLoad();
+    renderWithStore(<ChannelStatusSidebar/>);
+
+    expect(await screen.findByText('Failed to load the channel status')).toBeVisible();
+    await userEvent.click(screen.getByRole('button', {name: 'Try again'}));
+
+    expect(mockFetchChannelStatus).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText('Failed to load the channel status')).not.toBeInTheDocument();
+
+    await finishRetry('on-track');
+    expect((await currentStatus()).getByText('On track')).toBeVisible();
+});
+
+test('forgets a load error after switching channels and back', async () => {
+    mockFetchChannelStatus.mockRejectedValueOnce(new Error('Failed to load the channel status'));
+    const finishOther = slowLoad();
+    const finishReturn = slowLoad();
+    const store = renderWithStore(<ChannelStatusSidebar/>);
+    expect(await screen.findByText('Failed to load the channel status')).toBeVisible();
+
+    act(() => {
+        store.dispatch(switchChannel('other-channel-id'));
+    });
+    act(() => {
+        store.dispatch(switchChannel('channel-id'));
+    });
+
+    expect(mockFetchChannelStatus).toHaveBeenLastCalledWith('channel-id');
+    expect(screen.queryByText('Failed to load the channel status')).not.toBeInTheDocument();
+
+    await finishOther('');
+    await finishReturn('at-risk');
+    expect((await currentStatus()).getByText('At risk')).toBeVisible();
+});
+
 test('drops the load error when a status update arrives', async () => {
     mockFetchChannelStatus.mockRejectedValueOnce(new Error('Failed to load the channel status'));
     const store = renderWithStore(<ChannelStatusSidebar/>);

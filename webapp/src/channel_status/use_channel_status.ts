@@ -37,7 +37,6 @@ export function useChannelStatus(channelId: string) {
         }
 
         let stale = false;
-        setError(undefined);
         fetchOnce(channelId).then(
             (value) => {
                 // A WebSocket event that arrived while this request was in flight is newer.
@@ -49,6 +48,10 @@ export function useChannelStatus(channelId: string) {
         );
         return () => {
             stale = true;
+
+            // Forget this request's error before the next one starts (another channel, or a
+            // retry), so a fresh attempt doesn't show the old error.
+            setError(undefined);
         };
     }, [channelId, loaded, attempt, dispatch, store]);
 

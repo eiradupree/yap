@@ -2,18 +2,17 @@
 // See LICENSE.txt for license information.
 
 module.exports = {
+
+    // Matches the browsers supported by the Mattermost web app. Set at the top
+    // level so preset-env and the core-js polyfill plugin both use it.
+    targets: {
+        chrome: 110,
+        firefox: 102,
+        edge: 110,
+        safari: '16.4',
+    },
     presets: [
         ['@babel/preset-env', {
-
-            // Matches the browsers supported by the Mattermost web app.
-            targets: {
-                chrome: 110,
-                firefox: 102,
-                edge: 110,
-                safari: '16.4',
-            },
-            corejs: 3,
-            useBuiltIns: 'usage',
             shippedProposals: true,
         }],
 
@@ -21,9 +20,20 @@ module.exports = {
         ['@babel/preset-react', {
             runtime: 'automatic',
         }],
-        ['@babel/preset-typescript', {
-            allExtensions: true,
-            isTSX: true,
+
+        // Parses .ts files as TypeScript and .tsx files as TypeScript with JSX.
+        '@babel/preset-typescript',
+    ],
+    plugins: [
+
+        // Adds core-js polyfills for the features each file uses that the
+        // targets lack. Babel 8 moved this out of preset-env's useBuiltIns.
+        // version '3.0' matches the old `corejs: 3` setting, so the bundle
+        // gets the same polyfills it did under Babel 7.
+        ['babel-plugin-polyfill-corejs3', {
+            method: 'usage-global',
+            version: '3.0',
+            shippedProposals: true,
         }],
     ],
 };
