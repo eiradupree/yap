@@ -1,6 +1,6 @@
 # Yap
 
-Yap is an open-source, Slack-like workspace built on [Mattermost](https://mattermost.com). It ships as a Mattermost plugin (`com.eiradupree.yap`) that adds team-chat features on top of a self-hosted Mattermost server.
+Yap is an open-source, Slack-like workspace. It comes in two forms: a Mattermost plugin (`com.eiradupree.yap`) that adds team-chat features to a self-hosted Mattermost server, and its own [server and desktop app](#yap-without-mattermost) that don't need Mattermost at all.
 
 Yap is fully open source. It uses only open-source Mattermost components (the Apache-2.0 plugin API in `github.com/mattermost/mattermost/server/public` and MIT-licensed webapp packages) and does not include or depend on Mattermost Enterprise or Source Available code.
 
@@ -12,15 +12,95 @@ Yap is in early development. It is based on the [Mattermost plugin starter templ
 - **Channel status sidebar**: click the tag, or the flag icon in the App Bar, to view or change the status. Changing it requires permission to edit the channel header.
 - **Webhook endpoint**: `POST <SiteURL>/plugins/com.eiradupree.yap/webhook` with an `X-Webhook-Secret` header. Generate the secret under System Console > Plugins > Yap.
 
-## Yap server (no Mattermost)
+## Yap without Mattermost
 
-`yapserver/` is Yap's own chat server, an alternative to running on Mattermost. It's a single Go program with accounts, channels, message history and live updates. It stores everything in one SQLite file and serves its own web client. It's an MVP, live at <https://yap-chat-712e13.fly.dev> (invite-only). See [yapserver/README.md](yapserver/README.md) to run it and for what's still missing, and [yapserver/DEPLOY.md](yapserver/DEPLOY.md) to deploy it.
+Yap also has its own stack that doesn't need Mattermost at all:
 
-## Desktop app
+- **`yapserver/`**: the chat server. It's one Go program with accounts, channels, message history and live updates, storing everything in a single SQLite file and serving its own web client.
+- **`yapdesktop/`**: a small native macOS app for that server, with an unread badge on the dock icon and native notifications.
 
-`yapdesktop/` is the desktop app for the Yap server: a small native macOS app with a dock badge for unread messages and native notifications. See [yapdesktop/README.md](yapdesktop/README.md) to build and install it.
+Both are MVPs. The server is live at **<https://yap-chat-712e13.fly.dev>**.
 
-`desktop/` contains the earlier Mattermost-based Yap Desktop, a native app for macOS that runs on both Intel and Apple silicon Macs. It is a modified version of the Apache-2.0 [Mattermost Desktop](https://github.com/mattermost/desktop) app. See [desktop/README.md](desktop/README.md) to build it.
+### Use it
+
+1. **In a browser:** open <https://yap-chat-712e13.fly.dev>, click **Need an account? Create one**, and enter the invite code. Sign-up is invite-only. The code isn't in this repo because the repo is public. Ask the server owner for it, or set a new one (see [Operate the live server](#operate-the-live-server)).
+2. **On a Mac:** build the desktop app (below), open `yapdesktop/release/<version>/yap-<version>-mac-universal.dmg`, and drag **Yap** to Applications. It suggests the live server on first launch, so click **Connect** and sign in.
+   - Builds aren't signed with an Apple Developer ID. On another Mac, right-click **Yap** and choose **Open** the first time.
+   - If macOS asks to let Yap use **"Yap Safe Storage"** in your keychain, click **Always Allow**. It's the key that encrypts the app's saved sign-in. It may ask again after updates until builds are Developer ID signed.
+3. **Notifications:** click **Turn on notifications** in the sidebar, in the app or the browser.
+
+### Run it locally
+
+Needs Go (version in `yapserver/go.mod`) and, for the desktop app, Node.js 24.
+
+```bash
+# Server: http://localhost:8080, data in yapserver/yap.db
+cd yapserver
+go test -race ./...
+go build -o yapserver . && ./yapserver -addr 127.0.0.1:8080
+
+# Desktop app (another terminal). On the connect screen, enter http://localhost:8080
+cd yapdesktop
+export PATH="/opt/homebrew/opt/node@24/bin:$PATH"            # brew install node@24
+export DEVELOPER_DIR=/Library/Developer/CommandLineTools    # only if Xcode is broken
+npm ci
+npm test
+npm start              # run without packaging
+npm run package:mac    # universal DMG and zip in yapdesktop/release/
+```
+
+Locally, sign-up is open unless you set `YAP_INVITE_CODE`.
+
+### Operate the live server
+
+It runs on Fly.io as app `yap-chat-712e13`: one shared-cpu-1x machine in Chicago (`ord`) with 256 MB of memory and a 1 GB volume, at about $2–5 a month. You need the Fly CLI (`brew install flyctl`) and `fly auth login`. Then, from `yapserver/`:
+
+```bash
+fly deploy                                   # ship the current code
+fly logs                                     # watch logs
+fly status                                   # machine and health check
+fly secrets set YAP_INVITE_CODE=new-code     # change the invite code (restarts the server)
+```
+
+[yapserver/DEPLOY.md](yapserver/DEPLOY.md) covers backups, custom domains, scaling, the settings, and why this runs on one machine rather than Kubernetes.
+
+### What's built
+
+- **Accounts:** usernames and passwords (bcrypt) and 30-day sessions in an HttpOnly cookie. Sign-up is invite-only on the live server.
+- **Channels:** everyone starts in `#general`. Anyone can create, join or leave public channels, and the server checks that you've joined a channel before you can read or post in it.
+- **Live updates** over websockets, with an unread count in the page title and the dock badge.
+- **Protection:** rate limits on sign-in, sign-up (both per IP), posting and channel creation (both per user), and a cap of 10 live connections per user. Cross-site requests are refused, and the security headers include HSTS. The Docker image runs as an unprivileged user with no shell.
+- **Desktop app:** the server's pages run sandboxed with no Node.js access. Only the connected server may show notifications; every other permission is refused, and links outside Yap open in your browser. Electron's security fuses are set at build time.
+
+### What's been tested
+
+- **Server:** the Go test suite covers sign-in, permissions, paging, cross-site blocking, invite codes, rate limits, client IPs, connection caps and live delivery. It passes with `-race`.
+- **Live server:** checked from the internet. HTTPS redirect, invite enforcement, auth required, cross-site refusal and headers all work, and a faked `X-Forwarded-For` can't get around the rate limit.
+- **Capacity:** measured on a container capped to the Fly VM's size (1 CPU, 256 MB):
+
+  | Load | Send latency p50 / p99 | Live delivery | Memory |
+  | --- | --- | --- | --- |
+  | 500 users, 1,000 open tabs, 25 messages/s | 2.4 ms / 7.9 ms | 100% | under 40 MB |
+  | 200 users, 400 tabs, 200 messages/s in one channel | 1 ms / 58 ms | 100% (80,000/s) | under 40 MB |
+
+- **Desktop app:** unit tests cover address handling. The app was driven end to end against a local server: connect screen, sign-up, live messages, unread counts, dock badge, restart while signed in, offline screen and link handling. The packaged build was checked for both CPU architectures, a valid signature and the fuse settings, and it connected to the live server.
+- **Not checked yet:** the full sign-up flow on the live server (there's no way to delete test accounts, so none were made), and seeing a notification appear on screen.
+
+### Known issues and next steps
+
+- **Desktop signing:** ad-hoc signed only, so other Macs show a Gatekeeper warning and the keychain may prompt after updates. Fix with an Apple Developer ID and notarization.
+- **No automatic updates** in the desktop app, and no Windows or Linux builds yet.
+- **Missing chat features:** direct messages, private channels, editing and deleting messages, file uploads, password reset, admin roles, banning users and deleting accounts.
+- **Rate limits** are in memory, so they reset whenever the server restarts.
+- **Backups:** only Fly's daily volume snapshots, kept for 5 days. Add off-site backups, for example Litestream.
+- **Scaling past one machine** means moving from SQLite to Postgres (see [yapserver/DEPLOY.md](yapserver/DEPLOY.md)).
+- **Open decision:** whether to keep the Mattermost plugin and the old Mattermost-based `desktop/` app now that the own stack exists.
+
+Details: [yapserver/README.md](yapserver/README.md) (API, settings and code layout), [yapdesktop/README.md](yapdesktop/README.md), [docs/UPGRADES.md](docs/UPGRADES.md).
+
+## Desktop app (Mattermost-based)
+
+`desktop/` contains the earlier Mattermost-based Yap Desktop, a native app for macOS that runs on both Intel and Apple silicon Macs. It's a modified version of the Apache-2.0 [Mattermost Desktop](https://github.com/mattermost/desktop) app and can only connect to Mattermost servers. For the Yap server, use `yapdesktop/` instead. See [desktop/README.md](desktop/README.md) to build it.
 
 ## Roadmap
 
