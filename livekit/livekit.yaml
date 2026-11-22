@@ -1,0 +1,10 @@
+# LiveKit settings for Yap. entrypoint.sh appends the machine-specific parts
+# (the rtc section with this machine's addresses, and the webhook) at boot.
+port: 7880
+room:
+  # Each channel's call is one room.
+  max_participants: 50
+  empty_timeout: 300
+  departure_timeout: 20
+logging:
+  level: info

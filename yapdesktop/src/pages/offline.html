@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'">
+  <title>Yap</title>
+  <link rel="stylesheet" href="pages.css">
+  <script src="offline.js" defer></script>
+</head>
+<body>
+  <main class="center">
+    <div class="card">
+      <img src="icon.png" alt="" class="logo" width="56" height="56">
+      <h1>Can't reach Yap</h1>
+      <p class="muted">Couldn't connect to <strong id="server"></strong>. Check your internet connection.</p>
+      <p id="detail" class="muted small"></p>
+      <button id="retry" type="button">Try again</button>
+      <button id="change" type="button" class="link">Change server</button>
+    </div>
+  </main>
+</body>
+</html>

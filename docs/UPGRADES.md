@@ -2,6 +2,18 @@
 
 Planned work and open decisions for Yap, with what each one needs. Last updated 2026-11-20.
 
+## Own server (MVP, in progress)
+
+Goal: Yap runs on its own backend instead of Mattermost. The first version is in `yapserver/` (see [yapserver/README.md](../yapserver/README.md)). It provides accounts, public channels, message history and live updates, works locally and has tests.
+
+Needs:
+
+- **Desktop app**: done in `yapdesktop/` (see [yapdesktop/README.md](../yapdesktop/README.md)). Still to do: Developer ID signing and notarization, automatic updates, Windows and Linux builds.
+- **Hosting**: live on Fly.io at https://yap-chat-712e13.fly.dev (app `yap-chat-712e13`, region `ord`, one shared-cpu-1x machine with 256 MB and a 1 GB volume) (see [yapserver/DEPLOY.md](../yapserver/DEPLOY.md)). Still to do: a custom domain and off-site backups (for example Litestream).
+- **Features**: done: editing and deleting messages, notifications, password change, account deletion. Still needed: direct messages, private channels, file uploads, password reset by email, managing admins from the app.
+- **Abuse protection**: rate limits, invite-only sign-up, admin message deletion and bans are done. Still needed: rate limits that survive restarts.
+- **Open decision**: whether to keep the Mattermost plugin and desktop fork once the own server covers what's needed.
+
 ## Mobile app (planned, not started)
 
 Goal: a Yap-branded iOS and Android app, forked from [mattermost-mobile](https://github.com/mattermost/mattermost-mobile) (Apache-2.0, React Native) the same way `desktop/` was forked from Mattermost Desktop.

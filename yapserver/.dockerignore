@@ -1,0 +1,5 @@
+yap.db*
+yapserver
+Dockerfile
+.dockerignore
+*.md
