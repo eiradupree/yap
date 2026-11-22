@@ -13,10 +13,10 @@
     "check-types": "tsc"
   },
   "devDependencies": {
-    "@babel/core": "7.29.7",
-    "@babel/preset-env": "7.29.7",
-    "@babel/preset-react": "7.29.7",
-    "@babel/preset-typescript": "7.29.7",
+    "@babel/core": "8.1.3",
+    "@babel/preset-env": "8.0.7",
+    "@babel/preset-react": "8.0.1",
+    "@babel/preset-typescript": "8.0.7",
     "@mattermost/client": "11.9.0",
     "@mattermost/eslint-plugin": "1.1.0-0",
     "@mattermost/types": "11.9.0",
@@ -31,11 +31,12 @@
     "@typescript-eslint/eslint-plugin": "7.18.0",
     "@typescript-eslint/parser": "7.18.0",
     "babel-loader": "10.1.1",
+    "babel-plugin-polyfill-corejs3": "1.0.0",
     "css-loader": "7.1.5",
     "eslint": "8.57.1",
     "eslint-plugin-import": "2.32.0",
     "eslint-plugin-react": "7.37.5",
-    "eslint-plugin-react-hooks": "4.6.0",
+    "eslint-plugin-react-hooks": "7.1.1",
     "identity-obj-proxy": "3.0.0",
     "jest": "30.5.2",
     "jest-environment-jsdom": "30.5.2",
@@ -94,5 +95,10 @@
     "setupFilesAfterEnv": [
       "<rootDir>/tests/setup.tsx"
     ]
+  },
+  "overrides": {
+    "@mattermost/eslint-plugin": {
+      "eslint-plugin-react-hooks": "$eslint-plugin-react-hooks"
+    }
   }
 }
