@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -63,6 +64,8 @@ type Server struct {
 	authLimit    *limiter // login and register attempts per IP
 	postLimit    *limiter // messages per user
 	channelLimit *limiter // channel creations per user
+	uploadLimit  *limiter // file uploads per user
+	reactLimit   *limiter // reactions added or removed per user
 }
 
 func NewServer(store *Store, cfg Config) *Server {
@@ -74,6 +77,8 @@ func NewServer(store *Store, cfg Config) *Server {
 		authLimit:    newLimiter(6*time.Second, 10),
 		postLimit:    newLimiter(500*time.Millisecond, 20),
 		channelLimit: newLimiter(30*time.Second, 5),
+		uploadLimit:  newLimiter(3*time.Second, 10),
+		reactLimit:   newLimiter(250*time.Millisecond, 30),
 		admins:       map[string]bool{},
 	}
 	for _, name := range cfg.Admins {
@@ -111,6 +116,12 @@ func NewServer(store *Store, cfg Config) *Server {
 	s.mux.HandleFunc("POST /api/channels/{id}/messages", s.auth(s.handlePostMessage))
 	s.mux.HandleFunc("PATCH /api/messages/{id}", s.auth(s.handleEditMessage))
 	s.mux.HandleFunc("DELETE /api/messages/{id}", s.auth(s.handleDeleteMessage))
+	s.mux.HandleFunc("GET /api/messages/{id}/thread", s.auth(s.handleThread))
+	s.mux.HandleFunc("POST /api/messages/{id}/reactions", s.auth(s.handleAddReaction))
+	s.mux.HandleFunc("DELETE /api/messages/{id}/reactions", s.auth(s.handleRemoveReaction))
+	s.mux.HandleFunc("POST /api/uploads", s.auth(s.handleUpload))
+	s.mux.HandleFunc("DELETE /api/uploads/{id}", s.auth(s.handleDeleteUpload))
+	s.mux.HandleFunc("GET /api/files/{id}/{name}", s.auth(s.handleFile))
 	s.mux.HandleFunc("GET /api/admin/users", s.admin(s.handleListUsers))
 	s.mux.HandleFunc("POST /api/admin/users/{id}/ban", s.admin(s.handleBan))
 	s.mux.HandleFunc("POST /api/admin/users/{id}/unban", s.admin(s.handleUnban))
@@ -136,12 +147,22 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusForbidden, "cross-origin request refused")
 			return
 		}
-		// Requiring JSON forces a CORS preflight for any cross-site form post.
-		if ct, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); ct != "application/json" {
-			writeError(w, http.StatusUnsupportedMediaType, "expected application/json")
-			return
+		ct, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
+		if r.Method == http.MethodPost && r.URL.Path == "/api/uploads" {
+			// Files are sent raw. The custom header forces a CORS preflight.
+			if ct != "application/octet-stream" || r.Header.Get(uploadHeader) == "" {
+				writeError(w, http.StatusUnsupportedMediaType, "expected application/octet-stream with "+uploadHeader)
+				return
+			}
+			r.Body = http.MaxBytesReader(w, r.Body, maxUploadBytes)
+		} else {
+			// Requiring JSON forces a CORS preflight for any cross-site form post.
+			if ct != "application/json" {
+				writeError(w, http.StatusUnsupportedMediaType, "expected application/json")
+				return
+			}
+			r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 		}
-		r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
 	}
 	s.mux.ServeHTTP(w, r)
 }
@@ -456,12 +477,35 @@ func (s *Server) handlePostMessage(w http.ResponseWriter, r *http.Request, u Use
 		writeError(w, http.StatusTooManyRequests, "you're sending messages too quickly")
 		return
 	}
-	body, ok := messageBody(w, r)
-	if !ok {
+	var req struct {
+		Body          string  `json:"body"`
+		ParentID      int64   `json:"parent_id"`
+		AttachmentIDs []int64 `json:"attachment_ids"`
+	}
+	if !readJSON(w, r, &req) {
 		return
 	}
-	msg, err := s.store.PostMessage(r.Context(), u, id, body)
-	if err != nil {
+	body := strings.TrimSpace(req.Body)
+	if utf8.RuneCountInString(body) > maxMessageLen || body == "" && len(req.AttachmentIDs) == 0 {
+		writeError(w, http.StatusBadRequest, "message must be 1-4000 characters")
+		return
+	}
+	if len(req.AttachmentIDs) > maxAttachments {
+		writeError(w, http.StatusBadRequest, "a message can have up to 10 attachments")
+		return
+	}
+	slices.Sort(req.AttachmentIDs)
+	if len(slices.Compact(req.AttachmentIDs)) != len(req.AttachmentIDs) {
+		writeError(w, http.StatusBadRequest, "duplicate attachment")
+		return
+	}
+	msg, err := s.store.PostMessage(r.Context(), u, id, NewMessage{
+		Body: body, ParentID: req.ParentID, AttachmentIDs: req.AttachmentIDs,
+	})
+	if errors.Is(err, errBadParent) || errors.Is(err, errBadFile) {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	} else if err != nil {
 		s.storeError(w, "post message", err)
 		return
 	}
@@ -525,9 +569,22 @@ func (s *Server) handleDeleteMessage(w http.ResponseWriter, r *http.Request, u U
 		return
 	}
 	s.broadcastChannel(r.Context(), msg.ChannelID, event{
-		Type: "message_deleted", Message: &Message{ID: msg.ID, ChannelID: msg.ChannelID},
+		Type: "message_deleted", Message: &Message{ID: msg.ID, ChannelID: msg.ChannelID, ParentID: msg.ParentID},
 	})
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleThread(w http.ResponseWriter, r *http.Request, u User) {
+	id, ok := pathIDOf(w, r, "message")
+	if !ok {
+		return
+	}
+	parent, replies, err := s.store.Thread(r.Context(), u.ID, id)
+	if err != nil {
+		s.messageError(w, "get thread", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"parent": parent, "replies": replies})
 }
 
 func (s *Server) messageError(w http.ResponseWriter, op string, err error) {
