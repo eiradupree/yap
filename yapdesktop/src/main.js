@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, Menu, ipcMain, net, session, shell, dialog } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, net, session, shell, dialog, desktopCapturer, systemPreferences } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const { normalizeServerUrl, unreadFromTitle, isServerUrl, isSafeExternal } = require('./server-url');
@@ -8,7 +8,9 @@ const { normalizeServerUrl, unreadFromTitle, isServerUrl, isSafeExternal } = req
 const DEFAULT_SERVER = 'https://yap-chat-712e13.fly.dev';
 
 // Keep data apart from the old Mattermost-based build, which also used "Yap".
-app.setPath('userData', path.join(app.getPath('appData'), 'Yap Desktop'));
+// In development, YAP_USER_DATA points a test run at a throwaway folder.
+const devData = !app.isPackaged && process.env.YAP_USER_DATA;
+app.setPath('userData', devData || path.join(app.getPath('appData'), 'Yap Desktop'));
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -171,6 +173,19 @@ function changeServer() {
   showLocal('connect.html', { suggested: serverUrl || DEFAULT_SERVER, current: serverUrl || '' });
 }
 
+// On macOS, also ask the system for camera and microphone access; the first
+// time, this shows the macOS prompt.
+async function askForMedia(types) {
+  if (process.platform !== 'darwin') return true;
+  for (const type of types) {
+    const kind = type === 'video' ? 'camera' : type === 'audio' ? 'microphone' : null;
+    if (!kind) continue;
+    if (systemPreferences.getMediaAccessStatus(kind) === 'granted') continue;
+    if (!(await systemPreferences.askForMediaAccess(kind))) return false;
+  }
+  return true;
+}
+
 // ---- menu ----
 
 function buildMenu() {
@@ -232,14 +247,27 @@ app.on('second-instance', () => {
 });
 
 app.whenReady().then(() => {
-  // Only the connected server may show notifications; everything else
-  // (camera, microphone, location, ...) is refused.
+  // Only the connected server may show notifications and, for calls, use the
+  // camera and microphone. Everything else (location, MIDI, ...) is refused.
+  const fromServer = (url) => !!serverOrigin && !!url && isServerUrl(url, serverOrigin);
   session.defaultSession.setPermissionRequestHandler((wc, permission, callback, details) => {
-    const origin = details.requestingUrl || wc.getURL();
-    callback(permission === 'notifications' && !!serverOrigin && isServerUrl(origin, serverOrigin));
+    if (!fromServer(details.requestingUrl || wc.getURL())) return callback(false);
+    if (permission === 'notifications') return callback(true);
+    if (permission === 'media') {
+      askForMedia(details.mediaTypes || []).then(callback, () => callback(false));
+      return;
+    }
+    callback(false);
   });
   session.defaultSession.setPermissionCheckHandler((wc, permission, requestingOrigin) =>
-    permission === 'notifications' && !!serverOrigin && isServerUrl(requestingOrigin, serverOrigin));
+    (permission === 'notifications' || permission === 'media') && fromServer(requestingOrigin));
+  // Screen sharing: macOS 15+ shows its own picker; elsewhere share the
+  // main screen.
+  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
+    if (!fromServer(request.securityOrigin || request.frame?.url)) return callback({});
+    desktopCapturer.getSources({ types: ['screen'] })
+      .then((sources) => callback(sources[0] ? { video: sources[0] } : {}), () => callback({}));
+  }, { useSystemPicker: true });
 
   // Defense in depth: never let any page load a preload other than ours.
   app.on('web-contents-created', (_e, contents) => {

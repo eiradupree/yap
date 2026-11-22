@@ -1,0 +1,47 @@
+# LiveKit media server for Yap calls. See DEPLOY.md.
+app = "yap-livekit-712e13"
+primary_region = "ord"
+
+[build]
+
+[env]
+  # The app's dedicated IPv4 (fly ips list), which browsers send media to.
+  LIVEKIT_NODE_IP = "SET-AFTER-fly-ips-allocate-v4"
+  # Join and leave events go to the Yap server over Fly's private network.
+  YAP_WEBHOOK_URL = "http://yap-chat-712e13.internal:8080/api/livekit/webhook"
+
+# Signaling: browsers connect to wss://yap-livekit-712e13.fly.dev.
+[http_service]
+  internal_port = 7880
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/"
+    timeout = "5s"
+
+# Media over UDP (preferred).
+[[services]]
+  protocol = "udp"
+  internal_port = 7882
+
+  [[services.ports]]
+    port = 7882
+
+# Media over TCP, for networks that block UDP.
+[[services]]
+  protocol = "tcp"
+  internal_port = 7881
+  auto_stop_machines = "off"
+
+  [[services.ports]]
+    port = 7881
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

@@ -71,6 +71,7 @@ Database upgrades run on their own when a new version starts. Take a snapshot fi
 
 - **Accounts:** usernames and passwords (bcrypt) and 30-day sessions in an HttpOnly cookie. Sign-up is invite-only on the live server.
 - **Channels:** everyone starts in `#general`. Anyone can create, join or leave public channels, and the server checks that you've joined a channel before you can read or post in it.
+- **Calls:** voice and video calls in any channel, with screen sharing, through a self-hosted [LiveKit](livekit/README.md) media server. Click **Call** or **Video** in a channel's header. Everyone in the channel sees who's on the call and can join, and banned people are dropped from calls right away.
 - **Messages:** edit and delete your own. Changes show up live for everyone.
 - **Account settings:** change your password (signs out your other devices) or delete your account and everything you've posted.
 - **Admin tools:** people listed in `YAP_ADMINS` get a **Members** list where they can ban and unban people, optionally deleting everything a banned person posted, and they can delete any message. A ban signs the person out everywhere at once.
@@ -97,6 +98,7 @@ Database upgrades run on their own when a new version starts. Take a snapshot fi
 
 - **Desktop signing:** ad-hoc signed only, so other Macs show a Gatekeeper warning and the keychain may prompt after updates. Fix with an Apple Developer ID and notarization.
 - **No automatic updates** in the desktop app, and no Windows or Linux builds yet.
+- **Calls on the live server** need the LiveKit app deployed, which needs a card on the Fly account (see [livekit/README.md](livekit/README.md)). There's no TURN relay yet, so a few very locked-down networks can't connect to calls.
 - **Missing chat features:** direct messages, private channels, file uploads, password reset by email, reactions and threads.
 - **Admins** are set with `YAP_ADMINS`, not from inside the app.
 - **Rate limits** are in memory, so they reset whenever the server restarts.

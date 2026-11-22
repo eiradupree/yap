@@ -80,6 +80,7 @@ $('logout').addEventListener('click', async () => {
 });
 
 function signedOut() {
+  window.yapCalls?.hangUp();
   if (state.ws) { state.ws.onclose = null; state.ws.close(); state.ws = null; }
   state.me = null;
   state.current = null;
@@ -236,6 +237,7 @@ async function openChannel(id, { keepThread = false } = {}) {
   $('join-banner').hidden = joined;
   $('composer').hidden = !joined;
   $('leave').hidden = !joined || (ch && ch.name === 'general');
+  window.yapCalls?.channelOpened();
   if (!joined) return;
   try {
     const msgs = await api('GET', `/api/channels/${id}/messages`);
@@ -744,6 +746,7 @@ function connect() {
     $('conn').classList.add('live');
     // Catch up on anything missed while disconnected.
     if (state.wsRetry > 0) refresh();
+    window.yapCalls?.start();
     state.wsRetry = 0;
   };
   ws.onmessage = (e) => {
@@ -758,6 +761,8 @@ function connect() {
       updateReactions(ev.message);
     } else if (ev.type === 'user_removed') {
       refresh(); // their messages, replies and reactions are gone
+    } else if (ev.type === 'call_update') {
+      window.yapCalls?.update(ev.call);
     } else if (ev.type === 'channel_created') {
       loadChannels();
     }
