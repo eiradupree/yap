@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -27,6 +28,10 @@ func main() {
 	flag.Parse()
 	// Read from the environment only, so it doesn't show up in process listings.
 	invite := os.Getenv("YAP_INVITE_CODE")
+	var admins []string
+	if v := os.Getenv("YAP_ADMINS"); v != "" {
+		admins = strings.Split(v, ",")
+	}
 
 	store, err := OpenStore(*dbPath)
 	if err != nil {
@@ -36,7 +41,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              *addr,
-		Handler:           NewServer(store, Config{SecureCookies: *secure, BehindProxy: *behindProxy, InviteCode: invite}),
+		Handler:           NewServer(store, Config{SecureCookies: *secure, BehindProxy: *behindProxy, InviteCode: invite, Admins: admins}),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       2 * time.Minute,
 		MaxHeaderBytes:    64 << 10,
@@ -65,7 +70,7 @@ func main() {
 		if invite != "" {
 			signup = "invite-only"
 		}
-		log.Printf("yap server listening on %s (database %s, sign-up %s)", *addr, *dbPath, signup)
+		log.Printf("yap server listening on %s (database %s, sign-up %s, %d admins)", *addr, *dbPath, signup, len(admins))
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("listen: %v", err)
 		}

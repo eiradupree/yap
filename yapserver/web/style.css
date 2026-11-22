@@ -82,6 +82,7 @@ input, textarea {
 .sidebar h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 12px 6px 0; }
 .me { margin: 0 6px; font-size: 13px; }
 .notify { margin: 0 6px; font-size: 13px; text-align: left; }
+.sidebar-links { display: flex; gap: 14px; margin: 0 6px; font-size: 13px; }
 .channels { list-style: none; margin: 0; padding: 0; }
 .channels button {
   width: 100%;
@@ -111,7 +112,24 @@ input, textarea {
 .join-banner { padding: 24px 20px; display: flex; gap: 12px; align-items: center; }
 .join-banner p { margin: 0; }
 .messages { list-style: none; margin: 0; padding: 12px 20px; flex: 1; overflow-y: auto; }
-.messages li { padding: 3px 0; }
+.messages li { padding: 3px 0; position: relative; }
+.messages li:hover { background: var(--hover); margin: 0 -20px; padding-left: 20px; padding-right: 20px; }
+.messages .actions {
+  position: absolute;
+  top: 2px;
+  right: 20px;
+  display: none;
+  gap: 10px;
+  font-size: 13px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+.messages li:hover .actions, .messages li:focus-within .actions { display: flex; }
+.messages .edited { color: var(--muted); font-size: 12px; }
+.messages .edit { display: flex; gap: 8px; align-items: flex-start; margin: 4px 0; }
+.messages .edit textarea { resize: vertical; min-height: 2.4em; }
 .messages .meta { display: flex; gap: 8px; align-items: baseline; margin-top: 10px; }
 .messages .author { font-weight: 600; }
 .messages .time { font-size: 12px; color: var(--muted); }
@@ -119,6 +137,26 @@ input, textarea {
 .messages .empty { color: var(--muted); padding: 24px 0; }
 .composer { display: flex; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--border); }
 .composer textarea { resize: none; max-height: 160px; }
+
+.ok { color: var(--ok); min-height: 1.2em; margin: 0; }
+.dialog {
+  width: min(420px, calc(100vw - 32px));
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+.dialog::backdrop { background: rgb(0 0 0 / 45%); }
+.dialog header { display: flex; justify-content: space-between; align-items: center; }
+.dialog h2 { margin: 0; font-size: 18px; }
+.card-form { display: grid; gap: 10px; margin-top: 18px; }
+.card-form h3 { margin: 0; font-size: 15px; }
+.card-form p { margin: 0; }
+.card-form label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.card-form.danger button { background: var(--error); color: var(--accent-text); }
+.member-list { list-style: none; margin: 12px 0 0; padding: 0; max-height: 60vh; overflow-y: auto; }
+.member-list li { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); }
 
 @media (max-width: 640px) {
   .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }

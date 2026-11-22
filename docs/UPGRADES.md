@@ -10,8 +10,8 @@ Needs:
 
 - **Desktop app**: done in `yapdesktop/` (see [yapdesktop/README.md](../yapdesktop/README.md)). Still to do: Developer ID signing and notarization, automatic updates, Windows and Linux builds.
 - **Hosting**: live on Fly.io at https://yap-chat-712e13.fly.dev (app `yap-chat-712e13`, region `ord`, one shared-cpu-1x machine with 256 MB and a 1 GB volume) (see [yapserver/DEPLOY.md](../yapserver/DEPLOY.md)). Still to do: a custom domain and off-site backups (for example Litestream).
-- **Features**: direct messages, private channels, editing and deleting messages, file uploads, notifications, password reset, admin roles.
-- **Abuse protection**: rate limits and invite-only sign-up are done. Still needed: banning users, and rate limits that survive restarts.
+- **Features**: done: editing and deleting messages, notifications, password change, account deletion. Still needed: direct messages, private channels, file uploads, password reset by email, managing admins from the app.
+- **Abuse protection**: rate limits, invite-only sign-up, admin message deletion and bans are done. Still needed: rate limits that survive restarts.
 - **Open decision**: whether to keep the Mattermost plugin and desktop fork once the own server covers what's needed.
 
 ## Mobile app (planned, not started)

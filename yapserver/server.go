@@ -49,13 +49,16 @@ type Config struct {
 	BehindProxy bool
 	// InviteCode, when set, is required to create an account.
 	InviteCode string
+	// Admins lists the usernames that can ban people and delete any message.
+	Admins []string
 }
 
 type Server struct {
-	store *Store
-	hub   *Hub
-	cfg   Config
-	mux   *http.ServeMux
+	store  *Store
+	hub    *Hub
+	cfg    Config
+	mux    *http.ServeMux
+	admins map[string]bool // lowercased usernames
 
 	authLimit    *limiter // login and register attempts per IP
 	postLimit    *limiter // messages per user
@@ -71,6 +74,12 @@ func NewServer(store *Store, cfg Config) *Server {
 		authLimit:    newLimiter(6*time.Second, 10),
 		postLimit:    newLimiter(500*time.Millisecond, 20),
 		channelLimit: newLimiter(30*time.Second, 5),
+		admins:       map[string]bool{},
+	}
+	for _, name := range cfg.Admins {
+		if name = strings.TrimSpace(name); name != "" {
+			s.admins[strings.ToLower(name)] = true
+		}
 	}
 
 	static, _ := fs.Sub(webFS, "web")
@@ -92,12 +101,19 @@ func NewServer(store *Store, cfg Config) *Server {
 	s.mux.HandleFunc("POST /api/login", s.handleLogin)
 	s.mux.HandleFunc("POST /api/logout", s.handleLogout)
 	s.mux.HandleFunc("GET /api/me", s.auth(s.handleMe))
+	s.mux.HandleFunc("POST /api/me/password", s.auth(s.handleChangePassword))
+	s.mux.HandleFunc("DELETE /api/me", s.auth(s.handleDeleteAccount))
 	s.mux.HandleFunc("GET /api/channels", s.auth(s.handleListChannels))
 	s.mux.HandleFunc("POST /api/channels", s.auth(s.handleCreateChannel))
 	s.mux.HandleFunc("POST /api/channels/{id}/join", s.auth(s.handleJoin))
 	s.mux.HandleFunc("POST /api/channels/{id}/leave", s.auth(s.handleLeave))
 	s.mux.HandleFunc("GET /api/channels/{id}/messages", s.auth(s.handleListMessages))
 	s.mux.HandleFunc("POST /api/channels/{id}/messages", s.auth(s.handlePostMessage))
+	s.mux.HandleFunc("PATCH /api/messages/{id}", s.auth(s.handleEditMessage))
+	s.mux.HandleFunc("DELETE /api/messages/{id}", s.auth(s.handleDeleteMessage))
+	s.mux.HandleFunc("GET /api/admin/users", s.admin(s.handleListUsers))
+	s.mux.HandleFunc("POST /api/admin/users/{id}/ban", s.admin(s.handleBan))
+	s.mux.HandleFunc("POST /api/admin/users/{id}/unban", s.admin(s.handleUnban))
 	s.mux.HandleFunc("GET /api/ws", s.auth(s.handleWS))
 	s.mux.HandleFunc("GET /api/ping", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "app": "yap"})
@@ -157,8 +173,24 @@ func (s *Server) auth(next func(http.ResponseWriter, *http.Request, User)) http.
 			s.internal(w, "session lookup", err)
 			return
 		}
+		u.Admin = s.isAdmin(u.Username)
 		next(w, r, u)
 	}
+}
+
+// admin is auth plus a check that the user is an admin.
+func (s *Server) admin(next func(http.ResponseWriter, *http.Request, User)) http.HandlerFunc {
+	return s.auth(func(w http.ResponseWriter, r *http.Request, u User) {
+		if !u.Admin {
+			writeError(w, http.StatusForbidden, "admins only")
+			return
+		}
+		next(w, r, u)
+	})
+}
+
+func (s *Server) isAdmin(username string) bool {
+	return s.admins[strings.ToLower(username)]
 }
 
 type credentials struct {
@@ -191,8 +223,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "username must be 3-32 letters, digits, '.', '_' or '-'")
 		return
 	}
-	if len(c.Password) < minPassword || len(c.Password) > maxPassword {
-		writeError(w, http.StatusBadRequest, "password must be 8-72 characters")
+	if !validPassword(w, c.Password) {
 		return
 	}
 	u, err := s.store.CreateUser(r.Context(), c.Username, c.Password)
@@ -203,6 +234,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		s.internal(w, "create user", err)
 		return
 	}
+	u.Admin = s.isAdmin(u.Username)
 	s.startSession(w, r, u, http.StatusCreated)
 }
 
@@ -222,11 +254,23 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if errors.Is(err, errBadLogin) {
 		writeError(w, http.StatusUnauthorized, errBadLogin.Error())
 		return
+	} else if errors.Is(err, errBanned) {
+		writeError(w, http.StatusForbidden, errBanned.Error())
+		return
 	} else if err != nil {
 		s.internal(w, "check password", err)
 		return
 	}
+	u.Admin = s.isAdmin(u.Username)
 	s.startSession(w, r, u, http.StatusOK)
+}
+
+func validPassword(w http.ResponseWriter, pw string) bool {
+	if len(pw) < minPassword || len(pw) > maxPassword {
+		writeError(w, http.StatusBadRequest, "password must be 8-72 characters")
+		return false
+	}
+	return true
 }
 
 func (s *Server) startSession(w http.ResponseWriter, r *http.Request, u User, status int) {
@@ -249,17 +293,78 @@ func (s *Server) startSession(w http.ResponseWriter, r *http.Request, u User, st
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(cookieName); err == nil {
+		if u, err := s.store.SessionUser(r.Context(), c.Value); err == nil {
+			s.hub.KickSession(u.ID, u.session)
+		}
 		if err := s.store.DeleteSession(r.Context(), c.Value); err != nil {
 			s.internal(w, "delete session", err)
 			return
 		}
 	}
-	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true})
+	clearCookie(w)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func clearCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true})
 }
 
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request, u User) {
 	writeJSON(w, http.StatusOK, u)
+}
+
+// checkCurrentPassword rate limits like a login, since it's a password guess.
+func (s *Server) checkCurrentPassword(w http.ResponseWriter, r *http.Request, u User, pw string) bool {
+	if !s.allowAuthAttempt(w, r) {
+		return false
+	}
+	if len(pw) > maxPassword {
+		writeError(w, http.StatusForbidden, "current password is wrong")
+		return false
+	}
+	err := s.store.VerifyPassword(r.Context(), u.ID, pw)
+	if errors.Is(err, errBadLogin) {
+		writeError(w, http.StatusForbidden, "current password is wrong")
+		return false
+	} else if err != nil {
+		s.internal(w, "verify password", err)
+		return false
+	}
+	return true
+}
+
+func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request, u User) {
+	var req struct {
+		Current string `json:"current_password"`
+		New     string `json:"new_password"`
+	}
+	if !readJSON(w, r, &req) || !validPassword(w, req.New) || !s.checkCurrentPassword(w, r, u, req.Current) {
+		return
+	}
+	if err := s.store.ChangePassword(r.Context(), u, req.New); err != nil {
+		s.internal(w, "change password", err)
+		return
+	}
+	// Other devices are signed out; this one stays signed in.
+	s.hub.Kick(u.ID, u.session)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleDeleteAccount(w http.ResponseWriter, r *http.Request, u User) {
+	var req struct {
+		Password string `json:"password"`
+	}
+	if !readJSON(w, r, &req) || !s.checkCurrentPassword(w, r, u, req.Password) {
+		return
+	}
+	if err := s.store.DeleteUser(r.Context(), u.ID); err != nil {
+		s.internal(w, "delete account", err)
+		return
+	}
+	s.hub.Kick(u.ID, "")
+	s.broadcastAll(event{Type: "user_removed", UserID: u.ID})
+	clearCookie(w)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleListChannels(w http.ResponseWriter, r *http.Request, u User) {
@@ -351,15 +456,8 @@ func (s *Server) handlePostMessage(w http.ResponseWriter, r *http.Request, u Use
 		writeError(w, http.StatusTooManyRequests, "you're sending messages too quickly")
 		return
 	}
-	var req struct {
-		Body string `json:"body"`
-	}
-	if !readJSON(w, r, &req) {
-		return
-	}
-	body := strings.TrimSpace(req.Body)
-	if body == "" || utf8.RuneCountInString(body) > maxMessageLen {
-		writeError(w, http.StatusBadRequest, "message must be 1-4000 characters")
+	body, ok := messageBody(w, r)
+	if !ok {
 		return
 	}
 	msg, err := s.store.PostMessage(r.Context(), u, id, body)
@@ -371,10 +469,155 @@ func (s *Server) handlePostMessage(w http.ResponseWriter, r *http.Request, u Use
 	writeJSON(w, http.StatusCreated, msg)
 }
 
+// messageBody trims and checks a message's text.
+func messageBody(w http.ResponseWriter, r *http.Request) (string, bool) {
+	var req struct {
+		Body string `json:"body"`
+	}
+	if !readJSON(w, r, &req) {
+		return "", false
+	}
+	body := strings.TrimSpace(req.Body)
+	if body == "" || utf8.RuneCountInString(body) > maxMessageLen {
+		writeError(w, http.StatusBadRequest, "message must be 1-4000 characters")
+		return "", false
+	}
+	return body, true
+}
+
+func (s *Server) handleEditMessage(w http.ResponseWriter, r *http.Request, u User) {
+	id, ok := pathIDOf(w, r, "message")
+	if !ok {
+		return
+	}
+	if !s.postLimit.allow(strconv.FormatInt(u.ID, 10)) {
+		writeError(w, http.StatusTooManyRequests, "you're sending messages too quickly")
+		return
+	}
+	body, ok := messageBody(w, r)
+	if !ok {
+		return
+	}
+	msg, err := s.store.EditMessage(r.Context(), u.ID, id, body)
+	if err != nil {
+		s.messageError(w, "edit message", err)
+		return
+	}
+	s.broadcastChannel(r.Context(), msg.ChannelID, event{Type: "message_edited", Message: &msg})
+	writeJSON(w, http.StatusOK, msg)
+}
+
+// Authors can delete their own messages; admins can delete anyone's.
+func (s *Server) handleDeleteMessage(w http.ResponseWriter, r *http.Request, u User) {
+	id, ok := pathIDOf(w, r, "message")
+	if !ok {
+		return
+	}
+	msg, err := s.store.GetMessage(r.Context(), id)
+	if err == nil && msg.UserID != u.ID && !u.Admin {
+		err = errForbidden
+	}
+	if err == nil {
+		err = s.store.DeleteMessage(r.Context(), id)
+	}
+	if err != nil {
+		s.messageError(w, "delete message", err)
+		return
+	}
+	s.broadcastChannel(r.Context(), msg.ChannelID, event{
+		Type: "message_deleted", Message: &Message{ID: msg.ID, ChannelID: msg.ChannelID},
+	})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) messageError(w http.ResponseWriter, op string, err error) {
+	switch {
+	case errors.Is(err, errNotFound):
+		writeError(w, http.StatusNotFound, "message not found")
+	case errors.Is(err, errForbidden):
+		writeError(w, http.StatusForbidden, "that isn't your message")
+	case errors.Is(err, errNotMember):
+		writeError(w, http.StatusForbidden, "join the channel first")
+	default:
+		s.internal(w, op, err)
+	}
+}
+
+func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request, _ User) {
+	users, err := s.store.ListUsers(r.Context())
+	if err != nil {
+		s.internal(w, "list users", err)
+		return
+	}
+	for i := range users {
+		users[i].Admin = s.isAdmin(users[i].Username)
+	}
+	writeJSON(w, http.StatusOK, users)
+}
+
+func (s *Server) handleBan(w http.ResponseWriter, r *http.Request, admin User) {
+	var req struct {
+		DeleteMessages bool `json:"delete_messages"`
+	}
+	target, ok := s.banTarget(w, r, &req)
+	if !ok {
+		return
+	}
+	if target.ID == admin.ID || s.isAdmin(target.Username) {
+		writeError(w, http.StatusBadRequest, "admins can't be banned")
+		return
+	}
+	if err := s.store.SetBanned(r.Context(), target.ID, true, req.DeleteMessages); err != nil {
+		s.userError(w, "ban user", err)
+		return
+	}
+	s.hub.Kick(target.ID, "")
+	if req.DeleteMessages {
+		s.broadcastAll(event{Type: "user_removed", UserID: target.ID})
+	}
+	log.Printf("admin %d banned user %d (delete messages: %v)", admin.ID, target.ID, req.DeleteMessages)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleUnban(w http.ResponseWriter, r *http.Request, admin User) {
+	target, ok := s.banTarget(w, r, &struct{}{})
+	if !ok {
+		return
+	}
+	if err := s.store.SetBanned(r.Context(), target.ID, false, false); err != nil {
+		s.userError(w, "unban user", err)
+		return
+	}
+	log.Printf("admin %d unbanned user %d", admin.ID, target.ID)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) banTarget(w http.ResponseWriter, r *http.Request, req any) (User, bool) {
+	id, ok := pathIDOf(w, r, "user")
+	if !ok || !readJSON(w, r, req) {
+		return User{}, false
+	}
+	u, err := s.store.GetUser(r.Context(), id)
+	if err != nil {
+		s.userError(w, "find user", err)
+		return User{}, false
+	}
+	return u, true
+}
+
+func (s *Server) userError(w http.ResponseWriter, op string, err error) {
+	if errors.Is(err, errNotFound) {
+		writeError(w, http.StatusNotFound, "user not found")
+		return
+	}
+	s.internal(w, op, err)
+}
+
 type event struct {
 	Type    string   `json:"type"`
 	Message *Message `json:"message,omitempty"`
 	Channel *Channel `json:"channel,omitempty"`
+	UserID  int64    `json:"user_id,omitempty"` // user_removed: drop this user's messages
 }
 
 func (s *Server) broadcastChannel(ctx context.Context, channelID int64, e event) {
@@ -394,7 +637,7 @@ func (s *Server) broadcastAll(e event) {
 
 func (s *Server) handleWS(w http.ResponseWriter, r *http.Request, u User) {
 	// Accept rejects cross-origin handshakes by default.
-	c := s.hub.add(u.ID, maxConnsPerUser)
+	c := s.hub.add(u.ID, u.session, maxConnsPerUser)
 	if c == nil {
 		writeError(w, http.StatusTooManyRequests, "too many open connections")
 		return
@@ -415,6 +658,10 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request, u User) {
 		select {
 		case <-ctx.Done():
 			return
+		case <-c.done:
+			// Signed out, password changed or banned.
+			conn.Close(websocket.StatusPolicyViolation, "session ended")
+			return
 		case payload := <-c.send:
 			wctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 			err := conn.Write(wctx, websocket.MessageText, payload)
@@ -434,9 +681,13 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request, u User) {
 }
 
 func pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	return pathIDOf(w, r, "channel")
+}
+
+func pathIDOf(w http.ResponseWriter, r *http.Request, what string) (int64, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id <= 0 {
-		writeError(w, http.StatusNotFound, "channel not found")
+		writeError(w, http.StatusNotFound, what+" not found")
 		return 0, false
 	}
 	return id, true

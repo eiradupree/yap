@@ -60,7 +60,10 @@ fly deploy                                   # ship the current code
 fly logs                                     # watch logs
 fly status                                   # machine and health check
 fly secrets set YAP_INVITE_CODE=new-code     # change the invite code (restarts the server)
+fly secrets set YAP_ADMINS=yourname          # admin tools for these usernames (create the account first)
 ```
+
+Database upgrades run on their own when a new version starts. Take a snapshot first with `fly volumes snapshots create <volume-id>` (`fly volumes list` shows the ID).
 
 [yapserver/DEPLOY.md](yapserver/DEPLOY.md) covers backups, custom domains, scaling, the settings, and why this runs on one machine rather than Kubernetes.
 
@@ -68,13 +71,17 @@ fly secrets set YAP_INVITE_CODE=new-code     # change the invite code (restarts 
 
 - **Accounts:** usernames and passwords (bcrypt) and 30-day sessions in an HttpOnly cookie. Sign-up is invite-only on the live server.
 - **Channels:** everyone starts in `#general`. Anyone can create, join or leave public channels, and the server checks that you've joined a channel before you can read or post in it.
+- **Messages:** edit and delete your own. Changes show up live for everyone.
+- **Account settings:** change your password (signs out your other devices) or delete your account and everything you've posted.
+- **Admin tools:** people listed in `YAP_ADMINS` get a **Members** list where they can ban and unban people, optionally deleting everything a banned person posted, and they can delete any message. A ban signs the person out everywhere at once.
 - **Live updates** over websockets, with an unread count in the page title and the dock badge.
 - **Protection:** rate limits on sign-in, sign-up (both per IP), posting and channel creation (both per user), and a cap of 10 live connections per user. Cross-site requests are refused, and the security headers include HSTS. The Docker image runs as an unprivileged user with no shell.
 - **Desktop app:** the server's pages run sandboxed with no Node.js access. Only the connected server may show notifications; every other permission is refused, and links outside Yap open in your browser. Electron's security fuses are set at build time.
 
 ### What's been tested
 
-- **Server:** the Go test suite covers sign-in, permissions, paging, cross-site blocking, invite codes, rate limits, client IPs, connection caps and live delivery. It passes with `-race`.
+- **Server:** the Go test suite covers sign-in, permissions, paging, cross-site blocking, invite codes, rate limits, client IPs, connection caps, live delivery, editing and deleting, password changes, account deletion, bans and upgrading a database from the first release. It passes with `-race`, and GitHub Actions runs it on every pull request that touches `yapserver/` or `yapdesktop/`.
+- **Web client:** driven in Chrome with two users: editing, deleting, a ban with message clean-up (the banned user is kicked to sign-in and sees "suspended"), and changing a password.
 - **Live server:** checked from the internet. HTTPS redirect, invite enforcement, auth required, cross-site refusal and headers all work, and a faked `X-Forwarded-For` can't get around the rate limit.
 - **Capacity:** measured on a container capped to the Fly VM's size (1 CPU, 256 MB):
 
@@ -90,7 +97,8 @@ fly secrets set YAP_INVITE_CODE=new-code     # change the invite code (restarts 
 
 - **Desktop signing:** ad-hoc signed only, so other Macs show a Gatekeeper warning and the keychain may prompt after updates. Fix with an Apple Developer ID and notarization.
 - **No automatic updates** in the desktop app, and no Windows or Linux builds yet.
-- **Missing chat features:** direct messages, private channels, editing and deleting messages, file uploads, password reset, admin roles, banning users and deleting accounts.
+- **Missing chat features:** direct messages, private channels, file uploads, password reset by email, reactions and threads.
+- **Admins** are set with `YAP_ADMINS`, not from inside the app.
 - **Rate limits** are in memory, so they reset whenever the server restarts.
 - **Backups:** only Fly's daily volume snapshots, kept for 5 days. Add off-site backups, for example Litestream.
 - **Scaling past one machine** means moving from SQLite to Postgres (see [yapserver/DEPLOY.md](yapserver/DEPLOY.md)).

@@ -29,6 +29,8 @@ fly deploy --ha=false
 | Status and health checks | `fly status`, `fly checks list` |
 | Change the invite code | `fly secrets set YAP_INVITE_CODE=new-code` (restarts the server; existing accounts are unaffected) |
 | Open sign-up to anyone | `fly secrets unset YAP_INVITE_CODE` |
+| Make someone an admin | Create their account first, then `fly secrets set YAP_ADMINS=name1,name2` (restarts the server). Admins see **Members** in the sidebar, where they can ban and unban people, and can delete any message. |
+| Snapshot before a risky change | `fly volumes snapshots create <volume-id>` |
 | Bigger machine | `fly scale vm shared-cpu-2x` or `fly scale memory 512` |
 | Bigger disk | `fly volumes extend <volume-id> --size 5` |
 
@@ -53,6 +55,7 @@ Then create the DNS records that command prints. Fly issues the HTTPS certificat
 | `YAP_SECURE_COOKIES` / `-secure-cookies` | `true` | Session cookies only over HTTPS |
 | `YAP_BEHIND_PROXY` / `-behind-proxy` | `true` | Take client IPs from Fly's `X-Forwarded-For` for rate limiting |
 | `YAP_INVITE_CODE` (secret, env only) | set | Required to create an account |
+| `YAP_ADMINS` (secret, env only) | unset | Usernames with admin tools |
 | `YAP_DB` / `-db` | `/data/yap.db` | Database path, on the volume |
 | `PORT` / `-addr` | `8080` | Listen port |
 
@@ -73,4 +76,5 @@ The second row is far beyond normal team chat and saturates the CPU. If that eve
 - Messages: a burst of 20 per user, then 2 per second.
 - Channel creation: a burst of 5 per user, then 1 every 30 seconds.
 - 10 open live connections (tabs) per user.
+- Changing your password or deleting your account counts as a sign-in attempt, so guessing the current password is rate limited too. Editing counts toward the message limit.
 - Request bodies are capped at 64 KB and messages at 4,000 characters.

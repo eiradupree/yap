@@ -11,7 +11,9 @@ type Hub struct {
 }
 
 type client struct {
-	send chan []byte
+	send    chan []byte
+	session string        // hash of the session token that opened it
+	done    chan struct{} // closed when the server drops the connection
 }
 
 func NewHub() *Hub {
@@ -19,8 +21,8 @@ func NewHub() *Hub {
 }
 
 // add registers a connection, or returns nil if the user already has max.
-func (h *Hub) add(userID int64, max int) *client {
-	c := &client{send: make(chan []byte, 64)}
+func (h *Hub) add(userID int64, session string, max int) *client {
+	c := &client{send: make(chan []byte, 64), session: session, done: make(chan struct{})}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if len(h.conns[userID]) >= max {
@@ -69,5 +71,37 @@ func (h *Hub) SendAll(payload []byte) {
 			default:
 			}
 		}
+	}
+}
+
+// Kick closes the user's connections, except those opened by the session
+// keep (pass "" to close all). Used on sign-out, password change and bans.
+func (h *Hub) Kick(userID int64, keep string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for c := range h.conns[userID] {
+		if keep != "" && c.session == keep {
+			continue
+		}
+		close(c.done)
+		delete(h.conns[userID], c)
+	}
+	if len(h.conns[userID]) == 0 {
+		delete(h.conns, userID)
+	}
+}
+
+// KickSession closes the connections opened by one session.
+func (h *Hub) KickSession(userID int64, session string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for c := range h.conns[userID] {
+		if c.session == session {
+			close(c.done)
+			delete(h.conns[userID], c)
+		}
+	}
+	if len(h.conns[userID]) == 0 {
+		delete(h.conns, userID)
 	}
 }
