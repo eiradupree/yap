@@ -9,6 +9,7 @@ Status: MVP, live at <https://yap-chat-712e13.fly.dev> (invite-only). See [DEPLO
 - Accounts with a username and password (bcrypt). Sessions last 30 days, are kept in an HttpOnly cookie, and only the token's hash is stored.
 - Channels: everyone starts in `#general`. Anyone can create, join or leave public channels.
 - Message history with paging, plus live updates over a websocket. You can edit and delete your own messages.
+- Voice and video calls in every channel, with screen sharing, through a self-hosted [LiveKit](../livekit/README.md) server. Only channel members can join a channel's call. Calls are off unless the `LIVEKIT_*` settings are set.
 - Account settings: change your password (which signs out your other devices) or delete your account and everything you've posted.
 - Admins, listed in `YAP_ADMINS`, can delete any message and ban people. A ban signs the person out everywhere, closes their live connections and blocks sign-in, and can also delete everything they've posted.
 - Read and post permissions are checked on the server: you only see and post in channels you've joined.
@@ -35,6 +36,9 @@ Open <http://localhost:8080> and create an account.
 | `-secure-cookies` | `YAP_SECURE_COOKIES` | `false` | Mark session cookies `Secure`. Set it when serving over HTTPS. |
 | `-behind-proxy` | `YAP_BEHIND_PROXY` | `false` | Take the client IP from the last `X-Forwarded-For` entry. Set it only behind a reverse proxy. |
 | | `YAP_INVITE_CODE` | unset | When set, creating an account requires this code |
+| | `LIVEKIT_URL` | unset | LiveKit address browsers use, e.g. `wss://yap-livekit-712e13.fly.dev`. Calls are on when this, the key and the secret are set. |
+| | `LIVEKIT_API_URL` | from `LIVEKIT_URL` | How the server reaches LiveKit's API, e.g. over Fly's private network |
+| | `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` | unset | Shared with the LiveKit server. Keep the secret in Fly secrets. |
 | | `YAP_ADMINS` | unset | Comma-separated usernames that get admin tools. Create those accounts before setting it, or someone else could register the name first. |
 
 Or with Docker: `docker build -t yapserver . && docker run -p 8080:8080 -v yap-data:/data yapserver`.
@@ -55,6 +59,8 @@ go test -race ./...
 - `server.go`: HTTP API, authentication, CSRF checks, websocket endpoint
 - `ratelimit.go`: per-IP and per-user rate limits, client IP handling
 - `hub.go`: fans live events out to connected clients
+- `livekit.go`: call tokens, LiveKit webhooks, who's on each call, removing banned users from calls
+- `web/calls.js`, `web/calls.css`: the call screen; `web/vendor/`: the LiveKit browser client
 - `web/`: the web client
 
 ## API
@@ -82,7 +88,10 @@ All request and response bodies are JSON. Every POST must send `Content-Type: ap
 | `GET /api/admin/users` | admin | Every account, with `banned` and `admin` |
 | `POST /api/admin/users/{id}/ban` | admin | `{delete_messages?}`: ban a user. Admins can't be banned. |
 | `POST /api/admin/users/{id}/unban` | admin | Lift a ban |
-| `GET /api/ws` | session | Websocket with events for your channels (`message`, `message_edited`, `message_deleted`) and for everyone (`channel_created`, and `user_removed` when an account's messages are deleted). The server closes it on sign-out, password change or ban. |
+| `GET /api/calls` | session | Calls going on in channels you've joined, with who's on them |
+| `POST /api/channels/{id}/call` | member | `{}`: a one-hour LiveKit token for the channel's call, plus the LiveKit URL |
+| `POST /api/livekit/webhook` | LiveKit signature | Join and leave events from LiveKit |
+| `GET /api/ws` | session | Websocket with events for your channels (`message`, `message_edited`, `message_deleted`) and for everyone (`channel_created`, and `user_removed` when an account's messages are deleted, plus `call_update` when people join or leave a channel's call). The server closes it on sign-out, password change or ban. |
 
 Every state-changing request needs `Content-Type: application/json`, including `DELETE` (send `{}` when there's nothing else).
 

@@ -51,6 +51,8 @@ type Config struct {
 	InviteCode string
 	// Admins lists the usernames that can ban people and delete any message.
 	Admins []string
+	// LiveKit turns on voice and video calls.
+	LiveKit LiveKitConfig
 }
 
 type Server struct {
@@ -59,6 +61,10 @@ type Server struct {
 	cfg    Config
 	mux    *http.ServeMux
 	admins map[string]bool // lowercased usernames
+	csp    string
+
+	presence  *callPresence // who is on each channel's call
+	callLimit *limiter      // call joins per user
 
 	authLimit    *limiter // login and register attempts per IP
 	postLimit    *limiter // messages per user
@@ -94,7 +100,7 @@ func NewServer(store *Store, cfg Config) *Server {
 		if s.cfg.InviteCode != "" {
 			signup = "invite"
 		}
-		writeJSON(w, http.StatusOK, map[string]string{"signup": signup})
+		writeJSON(w, http.StatusOK, map[string]any{"signup": signup, "calls": s.cfg.LiveKit.enabled()})
 	})
 
 	s.mux.HandleFunc("POST /api/register", s.handleRegister)
@@ -118,6 +124,11 @@ func NewServer(store *Store, cfg Config) *Server {
 	s.mux.HandleFunc("GET /api/ping", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "app": "yap"})
 	})
+	s.registerCalls()
+	// Pages may connect only to this server and, for calls, the LiveKit server.
+	connect := append([]string{"'self'", "ws:", "wss:"}, cfg.LiveKit.origins()...)
+	s.csp = "default-src 'self'; connect-src " + strings.Join(connect, " ") +
+		"; img-src 'self' data:; media-src 'self' blob:; frame-ancestors 'none'"
 	return s
 }
 
@@ -125,13 +136,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("Referrer-Policy", "same-origin")
-	w.Header().Set("Content-Security-Policy",
-		"default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data:; frame-ancestors 'none'")
+	w.Header().Set("Content-Security-Policy", s.csp)
 	if s.cfg.SecureCookies {
 		// Served over HTTPS: tell browsers never to use plain HTTP for this site.
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000")
 	}
-	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+	// LiveKit's webhook is signed instead (see livekit.go).
+	if r.Method != http.MethodGet && r.Method != http.MethodHead && r.URL.Path != "/api/livekit/webhook" {
 		if !sameOrigin(r) {
 			writeError(w, http.StatusForbidden, "cross-origin request refused")
 			return
@@ -362,6 +373,7 @@ func (s *Server) handleDeleteAccount(w http.ResponseWriter, r *http.Request, u U
 		return
 	}
 	s.hub.Kick(u.ID, "")
+	s.removeFromCalls(u.ID, 0)
 	s.broadcastAll(event{Type: "user_removed", UserID: u.ID})
 	clearCookie(w)
 	w.WriteHeader(http.StatusNoContent)
@@ -425,6 +437,7 @@ func (s *Server) handleLeave(w http.ResponseWriter, r *http.Request, u User) {
 		s.internal(w, "leave channel", err)
 		return
 	}
+	s.removeFromCalls(u.ID, id)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -572,6 +585,7 @@ func (s *Server) handleBan(w http.ResponseWriter, r *http.Request, admin User) {
 		return
 	}
 	s.hub.Kick(target.ID, "")
+	s.removeFromCalls(target.ID, 0)
 	if req.DeleteMessages {
 		s.broadcastAll(event{Type: "user_removed", UserID: target.ID})
 	}

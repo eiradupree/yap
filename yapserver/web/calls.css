@@ -1,0 +1,90 @@
+/* Voice and video calls (calls.js). */
+.call-buttons { display: flex; gap: 6px; }
+.call-buttons button { padding: 5px 12px; font-size: 13px; }
+.chat-head .call-buttons + #leave { margin-left: 6px; }
+
+.call-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 20px;
+  background: color-mix(in srgb, var(--ok) 14%, var(--bg));
+  border-bottom: 1px solid var(--border);
+}
+.call-banner span { flex: 1; min-width: 12em; }
+.call-banner button { padding: 5px 12px; font-size: 13px; }
+.call-banner button.link { padding: 0; }
+
+.channels button.has-call::after { content: " 🔊"; font-size: 12px; }
+
+.call-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 20px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  max-height: 60%;
+  min-height: 0;
+}
+.call-stage header { display: flex; gap: 10px; align-items: baseline; }
+.call-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  overflow-y: auto;
+  min-height: 0;
+}
+.call-grid[data-count="1"] { grid-template-columns: minmax(0, 480px); }
+.call-tile {
+  position: relative;
+  margin: 0;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: 10px;
+  overflow: hidden;
+  outline: 3px solid transparent;
+  outline-offset: -3px;
+  transition: outline-color .15s;
+}
+.call-tile.speaking { outline-color: var(--ok); }
+.call-tile video { width: 100%; height: 100%; object-fit: cover; display: none; }
+.call-tile.screen video { object-fit: contain; }
+.call-tile.mirror video { transform: scaleX(-1); }
+.call-tile.has-video video { display: block; }
+.call-initial {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 40px;
+  font-weight: 600;
+  color: #fff;
+  background: #2c2d34;
+}
+.call-tile.has-video .call-initial { display: none; }
+.call-tile figcaption {
+  position: absolute;
+  left: 8px;
+  bottom: 6px;
+  max-width: calc(100% - 16px);
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 55%);
+  color: #fff;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.call-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+.call-controls button { padding: 6px 12px; font-size: 13px; background: var(--hover); color: var(--text); }
+.call-controls button.off { background: var(--error); color: var(--accent-text); }
+.call-controls button.danger { background: var(--error); color: var(--accent-text); margin-left: auto; }
+
+@media (max-width: 640px) {
+  .call-stage, .call-banner { padding-left: 16px; padding-right: 16px; }
+  .call-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .call-controls button.danger { margin-left: 0; }
+}

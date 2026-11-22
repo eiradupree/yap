@@ -1,7 +1,7 @@
 {
   "name": "yap-desktop",
   "productName": "Yap",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Yap desktop app: a native window for a Yap server",
   "author": "eiradupree",
   "license": "Apache-2.0",
@@ -41,7 +41,11 @@
       "icon": "build/icon.icns",
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
-      "artifactName": "yap-${version}-mac-universal.${ext}"
+      "artifactName": "yap-${version}-mac-universal.${ext}",
+      "extendInfo": {
+        "NSCameraUsageDescription": "Yap uses your camera for video calls.",
+        "NSMicrophoneUsageDescription": "Yap uses your microphone for calls."
+      }
     },
     "dmg": {
       "title": "Yap ${version}"

@@ -40,8 +40,14 @@ func main() {
 	defer store.Close()
 
 	srv := &http.Server{
-		Addr:              *addr,
-		Handler:           NewServer(store, Config{SecureCookies: *secure, BehindProxy: *behindProxy, InviteCode: invite, Admins: admins}),
+		Addr: *addr,
+		Handler: NewServer(store, Config{SecureCookies: *secure, BehindProxy: *behindProxy, InviteCode: invite, Admins: admins,
+			LiveKit: LiveKitConfig{
+				URL:       os.Getenv("LIVEKIT_URL"),
+				APIURL:    os.Getenv("LIVEKIT_API_URL"),
+				APIKey:    os.Getenv("LIVEKIT_API_KEY"),
+				APISecret: os.Getenv("LIVEKIT_API_SECRET"),
+			}}),
 		ReadHeaderTimeout: 10 * time.Second,
 		IdleTimeout:       2 * time.Minute,
 		MaxHeaderBytes:    64 << 10,
@@ -70,7 +76,11 @@ func main() {
 		if invite != "" {
 			signup = "invite-only"
 		}
-		log.Printf("yap server listening on %s (database %s, sign-up %s, %d admins)", *addr, *dbPath, signup, len(admins))
+		calls := "off"
+		if os.Getenv("LIVEKIT_URL") != "" && os.Getenv("LIVEKIT_API_SECRET") != "" {
+			calls = "on"
+		}
+		log.Printf("yap server listening on %s (database %s, sign-up %s, %d admins, calls %s)", *addr, *dbPath, signup, len(admins), calls)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("listen: %v", err)
 		}
