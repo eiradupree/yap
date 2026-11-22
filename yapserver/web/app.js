@@ -6,7 +6,7 @@ const state = {
   me: null,
   channels: [],
   current: null, // channel id
-  unread: new Set(),
+  unread: new Map(), // channel id -> unread message count
   ws: null,
   wsRetry: 0,
 };
@@ -76,6 +76,8 @@ $('logout').addEventListener('click', async () => {
   if (state.ws) { state.ws.onclose = null; state.ws.close(); state.ws = null; }
   state.me = null;
   state.current = null;
+  state.unread.clear();
+  updateTitle();
   showAuth();
 });
 
@@ -96,7 +98,7 @@ function renderChannels() {
     b.textContent = '# ' + ch.name;
     if (ch.id === state.current) b.classList.add('active');
     if (!ch.joined) b.classList.add('not-joined');
-    if (state.unread.has(ch.id)) b.classList.add('unread');
+    if (state.unread.get(ch.id)) b.classList.add('unread');
     b.addEventListener('click', () => openChannel(ch.id));
     li.append(b);
     ul.append(li);
@@ -124,6 +126,7 @@ function currentChannel() {
 async function openChannel(id) {
   state.current = id;
   state.unread.delete(id);
+  updateTitle();
   try { localStorage.setItem('yap.channel', String(id)); } catch {}
   renderChannels();
   const ch = currentChannel();
@@ -271,11 +274,12 @@ function connect() {
       const m = ev.message;
       if (seen.has(m.id)) return;
       seen.add(m.id);
-      if (m.channel_id === state.current) {
-        appendMessage(m);
-      } else {
-        state.unread.add(m.channel_id);
+      if (m.channel_id === state.current) appendMessage(m);
+      if (m.user_id !== state.me.id && (m.channel_id !== state.current || document.hidden)) {
+        state.unread.set(m.channel_id, (state.unread.get(m.channel_id) || 0) + 1);
         renderChannels();
+        updateTitle();
+        notify(m);
       }
     } else if (ev.type === 'channel_created') {
       loadChannels();
@@ -292,12 +296,57 @@ function connect() {
   };
 }
 
+// ---- unread count and notifications ----
+
+// The count in the title doubles as the dock badge in the desktop app.
+function updateTitle() {
+  let total = 0;
+  for (const n of state.unread.values()) total += n;
+  document.title = total > 0 ? `(${total}) Yap` : 'Yap';
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && state.current != null && state.unread.has(state.current)) {
+    state.unread.delete(state.current);
+    renderChannels();
+    updateTitle();
+  }
+});
+
+function notificationsSupported() {
+  return 'Notification' in window;
+}
+
+function renderNotifyButton() {
+  $('notify').hidden = !(notificationsSupported() && Notification.permission === 'default');
+}
+
+$('notify').addEventListener('click', async () => {
+  await Notification.requestPermission();
+  renderNotifyButton();
+});
+
+function notify(m) {
+  if (!notificationsSupported() || Notification.permission !== 'granted') return;
+  if (!document.hidden && document.hasFocus() && m.channel_id === state.current) return;
+  const ch = state.channels.find((c) => c.id === m.channel_id);
+  const n = new Notification(`${m.username} in #${ch ? ch.name : 'channel'}`, {
+    body: m.body.length > 200 ? m.body.slice(0, 200) + '…' : m.body,
+    tag: `yap-channel-${m.channel_id}`,
+  });
+  n.onclick = () => {
+    window.focus();
+    openChannel(m.channel_id);
+  };
+}
+
 // ---- boot ----
 
 async function startApp() {
   $('auth').hidden = true;
   $('app').hidden = false;
   $('me').textContent = 'Signed in as ' + state.me.username;
+  renderNotifyButton();
   await loadChannels();
   let saved = null;
   try { saved = Number(localStorage.getItem('yap.channel')); } catch {}

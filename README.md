@@ -14,11 +14,13 @@ Yap is in early development. It is based on the [Mattermost plugin starter templ
 
 ## Yap server (no Mattermost)
 
-`yapserver/` is Yap's own chat server, an alternative to running on Mattermost. It's a single Go program with accounts, channels, message history and live updates. It stores everything in one SQLite file and serves its own web client. It's an MVP that so far only runs locally. See [yapserver/README.md](yapserver/README.md) to run it and for what's still missing.
+`yapserver/` is Yap's own chat server, an alternative to running on Mattermost. It's a single Go program with accounts, channels, message history and live updates. It stores everything in one SQLite file and serves its own web client. It's an MVP, live at <https://yap-chat-712e13.fly.dev> (invite-only). See [yapserver/README.md](yapserver/README.md) to run it and for what's still missing, and [yapserver/DEPLOY.md](yapserver/DEPLOY.md) to deploy it.
 
 ## Desktop app
 
-`desktop/` contains Yap Desktop, a native app for macOS that runs on both Intel and Apple silicon Macs. It is a modified version of the Apache-2.0 [Mattermost Desktop](https://github.com/mattermost/desktop) app. See [desktop/README.md](desktop/README.md) to build it.
+`yapdesktop/` is the desktop app for the Yap server: a small native macOS app with a dock badge for unread messages and native notifications. See [yapdesktop/README.md](yapdesktop/README.md) to build and install it.
+
+`desktop/` contains the earlier Mattermost-based Yap Desktop, a native app for macOS that runs on both Intel and Apple silicon Macs. It is a modified version of the Apache-2.0 [Mattermost Desktop](https://github.com/mattermost/desktop) app. See [desktop/README.md](desktop/README.md) to build it.
 
 ## Roadmap
 

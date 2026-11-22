@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'">
+  <title>Yap</title>
+  <link rel="stylesheet" href="pages.css">
+  <script src="connect.js" defer></script>
+</head>
+<body>
+  <main class="center">
+    <form id="form" class="card">
+      <img src="icon.png" alt="" class="logo" width="56" height="56">
+      <h1>Connect to Yap</h1>
+      <p class="muted">Enter the address of your Yap server.</p>
+      <label>Server address
+        <input id="url" type="text" inputmode="url" autocomplete="url" spellcheck="false" required>
+      </label>
+      <p id="error" class="error" role="alert"></p>
+      <button id="submit" type="submit">Connect</button>
+      <button id="cancel" type="button" class="link" hidden>Cancel</button>
+    </form>
+  </main>
+</body>
+</html>

@@ -11,7 +11,8 @@ Status: MVP, live at <https://yap-chat-712e13.fly.dev> (invite-only). See [DEPLO
 - Message history with paging, plus live updates over a websocket.
 - Read and post permissions are checked on the server: you only see and post in channels you've joined.
 - Optional invite-only sign-up, rate limits on sign-in, sign-up, posting and channel creation, and a cap of 10 live connections per user.
-- The web client (`web/`) is plain HTML, CSS and JavaScript, built into the binary. It has light and dark themes and works on phone-sized screens.
+- The web client (`web/`) is plain HTML, CSS and JavaScript, built into the binary. It has light and dark themes and works on phone-sized screens. It shows the unread count in the page title and can show browser notifications.
+- A native macOS app is in [`../yapdesktop`](../yapdesktop/README.md).
 
 ## Run
 
@@ -77,7 +78,6 @@ Rules: usernames are 3 to 32 characters (letters, digits, `.`, `_`, `-`) and cas
 
 ## Not built yet
 
-- **Desktop app**: `desktop/` is still the Mattermost-based app, and its Connect screen only accepts Mattermost servers. It needs a small replacement app that opens a Yap server.
 - **Features**: direct messages, private channels, editing and deleting messages, file uploads, notifications, password reset, admin roles.
 - **Abuse protection**: rate limits are in memory, so they reset on restart. There's no account lockout, and no way to ban a user yet.
 - **Scaling past one machine**: needs Postgres instead of SQLite (see [DEPLOY.md](DEPLOY.md)).

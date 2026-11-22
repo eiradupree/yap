@@ -81,6 +81,7 @@ input, textarea {
 .sidebar-head { display: flex; justify-content: space-between; align-items: center; padding: 0 6px; }
 .sidebar h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 12px 6px 0; }
 .me { margin: 0 6px; font-size: 13px; }
+.notify { margin: 0 6px; font-size: 13px; text-align: left; }
 .channels { list-style: none; margin: 0; padding: 0; }
 .channels button {
   width: 100%;

@@ -1,0 +1,53 @@
+{
+  "name": "yap-desktop",
+  "productName": "Yap",
+  "version": "0.1.0",
+  "description": "Yap desktop app: a native window for a Yap server",
+  "author": "eiradupree",
+  "license": "Apache-2.0",
+  "private": true,
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.js",
+    "package:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --universal --publish=never"
+  },
+  "devDependencies": {
+    "electron": "43.8.3",
+    "electron-builder": "26.6.0"
+  },
+  "build": {
+    "appId": "com.eiradupree.yap.desktop",
+    "productName": "Yap",
+    "copyright": "Copyright © 2026 eiradupree",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "electronFuses": {
+      "runAsNode": false,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true
+    },
+    "mac": {
+      "category": "public.app-category.social-networking",
+      "icon": "build/icon.icns",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "artifactName": "yap-${version}-mac-universal.${ext}"
+    },
+    "dmg": {
+      "title": "Yap ${version}"
+    }
+  },
+  "allowScripts": {
+    "electron-winstaller": false
+  }
+}
