@@ -1,0 +1,60 @@
+/* menus components: styles HeroUI's stylesheet doesn't cover. */
+
+/* Sections fill the menu's width (menu-section.css aligns items to start). */
+.menu-section > .menu-item { align-self: stretch; }
+
+/* Separators get a little room above and below. */
+.dropdown__menu > [data-slot="separator"] { margin-block: calc(var(--spacing) * 1); }
+
+/* An item's icon column. HeroUI's examples wrap the icon in Tailwind
+   utilities ("flex h-8 items-start pt-px"), which aren't compiled. */
+.yui-menu-item__icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  color: var(--muted);
+}
+/* With a description, the icon lines up with the label's first line. */
+.menu-item:has(.yui-menu-item__text) > .yui-menu-item__icon {
+  align-self: flex-start;
+  height: calc(var(--text-sm) * var(--text-sm--line-height));
+}
+.yui-menu-item__icon > svg { width: 16px; height: 16px; }
+.menu-item--danger > .yui-menu-item__icon { color: var(--danger); }
+
+/* Label + description column ("flex flex-col" in HeroUI's examples). */
+.yui-menu-item__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+.yui-menu-item__text > .description {
+  /* At most two lines (PatternFly). */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* The keyboard shortcut sits at the inline end ("ms-auto"). */
+.menu-item > .kbd[data-slot="keyboard"] { margin-inline-start: auto; flex-shrink: 0; }
+/* Leave room for the submenu chevron when an item has both. */
+.menu-item[data-has-submenu="true"] > .kbd[data-slot="keyboard"] { margin-inline-end: 0; }
+
+/* An open submenu's trigger stays highlighted. */
+.menu-item[data-open="true"] { background-color: var(--default); }
+
+/* Yap's note under a menu (the attachment menu's drag-and-drop hint). */
+.yui-dropdown__footer {
+  /* Fill the popover's width without widening it. */
+  width: 0;
+  min-width: 100%;
+  padding: 0 calc(var(--spacing) * 4) calc(var(--spacing) * 3);
+  margin-top: calc(var(--spacing) * -0.5);
+}
+
+/* Disabled tabs with a reason keep pointer events, so the tooltip can show
+   on hover; menus.js ignores their clicks. */
+.tabs__tab[aria-disabled="true"][data-explained="true"] { pointer-events: auto; }
+

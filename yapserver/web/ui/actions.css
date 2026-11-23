@@ -1,0 +1,37 @@
+/* actions components: styles HeroUI's stylesheet doesn't cover. */
+
+/* A pending button hides its leading icon while the spinner stands in for it,
+   so the width doesn't change. */
+.button .yui-button__hidden-icon { display: none; }
+
+/* The spinner stands in for an icon: take the icon's negative margins too. */
+.button > .spinner.yui-button__spinner--icon { margin-inline: calc(var(--spacing) * -0.5); }
+
+/* HeroUI's vertical groups keep each button's own width (w-fit) and center
+   them, so the stack has ragged edges. Make the buttons one width. */
+.button-group.button-group--vertical,
+.toggle-button-group.toggle-button-group--vertical { align-items: stretch; }
+.button-group--vertical > .button,
+.toggle-button-group--vertical > .toggle-button { width: auto; }
+
+/* Links inside running text need more than color to stand out (WCAG 1.4.1). */
+.link.yui-link--underline { text-decoration-line: underline; }
+
+/* Off the Mac, Kbd joins keys with "+": keep it quieter than the keys. */
+.kbd .yui-kbd__plus { opacity: 0.7; }
+
+/* Windows High Contrast drops box-shadow, which is HeroUI's focus ring. */
+@media (forced-colors: active) {
+  .button:focus-visible,
+  .close-button:focus-visible,
+  .toggle-button:focus-visible,
+  .link:focus-visible {
+    outline: 2px solid CanvasText;
+    outline-offset: 2px;
+  }
+  .toggle-button[data-selected="true"] { outline: 2px solid Highlight; outline-offset: -2px; }
+}
+
+/* Spacing between separate actions (PatternFly): 16px in a row, 8px stacked. */
+.yui-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.yui-actions--vertical { flex-direction: column; align-items: stretch; gap: 8px; }

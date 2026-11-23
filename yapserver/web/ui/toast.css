@@ -1,0 +1,83 @@
+/* toast components: styles HeroUI's stylesheet doesn't cover.
+ * Unlayered, so these win over HeroUI's layered rules. */
+
+/* Distance from the viewport edge is configurable (toast.configure({offset})),
+ * so the stack can sit clear of Yap's message box; it respects safe areas. */
+.toast-region--bottom,
+.toast-region--bottom-start,
+.toast-region--bottom-end {
+  bottom: calc(var(--yui-toast-offset, 1rem) + env(safe-area-inset-bottom, 0px));
+}
+
+.toast-region--top,
+.toast-region--top-start,
+.toast-region--top-end {
+  top: calc(var(--yui-toast-offset, 1rem) + env(safe-area-inset-top, 0px));
+}
+
+/* The list is only a wrapper; toasts position against the region. */
+.yui-toast-list {
+  display: contents;
+}
+
+/* Always show the close button on the toasts you can see (PatternFly: always
+ * include one). HeroUI reveals it on hover only, which hides it from touch
+ * and keyboard users. 24px meets WCAG 2.5.8's target size. */
+.toast[data-frontmost="true"] .toast__close-button,
+.toast[data-expanded="true"]:not([data-hidden="true"]) .toast__close-button {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.toast .toast__close-button {
+  width: 1.5rem;
+  height: 1.5rem;
+  top: -0.375rem;
+  inset-inline-end: -0.375rem;
+}
+
+/* Exiting toasts never show it (HeroUI's rule, restated after the above). */
+.toast[data-exiting="true"] .toast__close-button {
+  pointer-events: none;
+  opacity: 0;
+}
+
+/* Room for the close button, so long titles don't run under it. */
+.toast {
+  padding-inline-end: 1.25rem;
+}
+
+/* The focused toast's ring sits outside its rounded edge. */
+.toast:focus-visible {
+  outline-offset: 2px;
+}
+
+/* "N more notifications" sits just beyond the visible stack. */
+.yui-toast-overflow {
+  position: absolute;
+  inset-inline-end: 0;
+  pointer-events: auto;
+  box-shadow: var(--overlay-shadow);
+  /* translate, not transform: HeroUI's button scales with transform on press. */
+  transition: translate 350ms var(--ease-out-fluid, ease-out), transform 250ms var(--ease-smooth), background-color 100ms var(--ease-out);
+}
+
+.yui-toast-overflow[data-placement="bottom"] {
+  bottom: 0;
+  translate: 0 calc(-1 * var(--yui-overflow-offset, 0px));
+}
+
+.yui-toast-overflow[data-placement="top"] {
+  top: 0;
+  translate: 0 var(--yui-overflow-offset, 0px);
+}
+
+.yui-toast-overflow[hidden] {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yui-toast-overflow {
+    transition: none;
+  }
+}
