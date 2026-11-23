@@ -49,6 +49,22 @@
     content: url('../../../assets/yap-icon.svg');
 }
 
+/* With custom branding on (see server/branding.go) that page shows the Site
+   Name instead of the logo; put Yap's mark before it. */
+.yap-branded .get-app__custom-site-name {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-s);
+}
+
+.yap-branded .get-app__custom-site-name::before {
+    width: 40px;
+    height: 40px;
+    flex: none;
+    background: url('../../../assets/yap-icon.svg') center / contain no-repeat;
+    content: '';
+}
+
 /* Global header, top left: the Mattermost wordmark and "TEAM EDITION" badge.
    Licensed editions show the product name there instead, which is left alone. */
 .yap-branded .globalHeader-leftControls-productBranding-freeEdition {

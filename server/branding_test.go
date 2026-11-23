@@ -27,3 +27,27 @@ func TestSiteNameToSet(t *testing.T) {
 		})
 	}
 }
+
+func TestApplyBrandingDefaults(t *testing.T) {
+	t.Run("defaults are branded", func(t *testing.T) {
+		cfg := &model.Config{}
+		cfg.SetDefaults()
+		assert.True(t, applyBrandingDefaults(cfg))
+		assert.Equal(t, "Yap", *cfg.TeamSettings.SiteName)
+		assert.True(t, *cfg.TeamSettings.EnableCustomBrand)
+		assert.Equal(t, yapBrandText, *cfg.TeamSettings.CustomBrandText)
+		assert.False(t, applyBrandingDefaults(cfg), "a second run changes nothing")
+	})
+
+	t.Run("an admin's choices are kept", func(t *testing.T) {
+		cfg := &model.Config{}
+		cfg.SetDefaults()
+		cfg.TeamSettings.SiteName = model.NewPointer("Acme Chat")
+		cfg.TeamSettings.EnableCustomBrand = model.NewPointer(false)
+		cfg.TeamSettings.CustomBrandText = model.NewPointer("Acme's own text")
+		assert.False(t, applyBrandingDefaults(cfg))
+		assert.Equal(t, "Acme Chat", *cfg.TeamSettings.SiteName)
+		assert.False(t, *cfg.TeamSettings.EnableCustomBrand)
+		assert.Equal(t, "Acme's own text", *cfg.TeamSettings.CustomBrandText)
+	})
+}

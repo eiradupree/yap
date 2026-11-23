@@ -24,7 +24,7 @@ The plugin's UI is built with [HeroUI v3](https://heroui.com/docs/react/getting-
 
 - `src/branding/` shows Yap's logo (`assets/yap-icon.svg`, the one source) in place of Mattermost's: the header of the pages before sign-in, the global header, the favicon (with unread and mention dots) and system-message avatars. The host loads plugin bundles before sign-in too (`GET /api/v4/plugins/webapp` needs no session), so `initialize` runs on the login page: keep it free of calls that need a user.
 - The host has no setting for these logos, so `branding.css` targets the host's classes under `.yap-branded`; if a host release renames them, its own logo shows again. Check them on each new `min_server_version`.
-- The server's `NameSiteYap` setting (`server/branding.go`) names the site Yap for the tab title and the sign-in header.
+- The server's `NameSiteYap` setting (`server/branding.go`) names the site Yap for the tab title and the sign-in header, and turns on custom branding with Yap's text, which removes "Mattermost" from the sign-up subtitle and the landing page.
 
 ## Compass
 
