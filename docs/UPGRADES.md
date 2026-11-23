@@ -40,16 +40,11 @@ The macOS universal build works (see `desktop/README.md`). Still to do:
 - **Security reports**: `desktop/SECURITY.md` points to GitHub private vulnerability reporting. Turn it on under the repo's Settings > Code security.
 - **Upstream updates**: the desktop code is a copy of Mattermost Desktop v6.3.2 without its git history. To take a newer release, diff it against v6.3.2 and reapply the changes in `desktop/MODIFICATIONS.md`.
 
-## Plugin webapp UI library (open decision)
+## Plugin webapp UI library
 
-The plugin's webapp bundles `@mattermost/compass-ui`, which has no license field or LICENSE file, and its source repository (`mattermost/compass-design`) isn't public. That makes its license unverifiable. It's used for the global styles (`webapp/src/index.tsx`) and one `Button` in `webapp/src/components/channel_status_sidebar/`.
+Decided: the plugin's components use [HeroUI v3](https://heroui.com/docs/react/getting-started) (`@heroui/react`, Apache-2.0, on React Aria). HeroUI needs React 19, so `min_server_version` is 12.0. See "HeroUI" in `webapp/AGENTS.md` for how its styles are kept off the host page and follow the user's theme.
 
-Options: confirm its license with Mattermost, or replace it with a library you choose. Criteria:
-
-- Open-source license (MIT, Apache-2.0 or similar) declared in `package.json` and a LICENSE file.
-- Works with React 18 (the plugin uses the host's React on Mattermost 11.7).
-- Styles through CSS variables, so it follows the user's Mattermost theme (`--button-bg`, `--center-channel-bg` and so on).
-- Tree-shakeable; the webapp bundle is already over webpack's size warning.
+Still open: `@mattermost/compass-ui` has no license field or LICENSE file, and its source repository (`mattermost/compass-design`) isn't public. The plugin no longer uses its components, only its global styles (`webapp/src/index.tsx`), which provide the spacing, radius and type tokens the plugin's CSS uses. Mattermost 12.0 doesn't load them itself. Either confirm its license with Mattermost, or declare those tokens in the plugin and drop the package.
 
 ## Development machine notes
 

@@ -16,7 +16,7 @@ module.exports = {
             shippedProposals: true,
         }],
 
-        // The automatic runtime imports react/jsx-runtime, which webpack aliases to src/jsx_runtime.ts.
+        // The automatic runtime imports react/jsx-runtime, which webpack maps to the host's window.ReactJSXRuntime.
         ['@babel/preset-react', {
             runtime: 'automatic',
         }],

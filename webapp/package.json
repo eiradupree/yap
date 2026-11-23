@@ -20,14 +20,15 @@
     "@mattermost/client": "11.9.0",
     "@mattermost/eslint-plugin": "1.1.0-0",
     "@mattermost/types": "11.9.0",
+    "@tailwindcss/postcss": "4.3.5",
     "@testing-library/dom": "10.4.2",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.12",
     "@types/jest": "30.0.0",
     "@types/node": "24.19.2",
-    "@types/react": "18.2.64",
-    "@types/react-dom": "18.2.25",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
     "@typescript-eslint/eslint-plugin": "7.18.0",
     "@typescript-eslint/parser": "7.18.0",
     "babel-loader": "10.1.1",
@@ -41,21 +42,31 @@
     "jest": "30.5.2",
     "jest-environment-jsdom": "30.5.2",
     "jest-junit": "17.0.0",
-    "react": "18.2.0",
-    "react-dom": "18.2.0",
+    "postcss": "8.5.33",
+    "postcss-loader": "8.2.2",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "react-intl": "7.1.14",
     "react-redux": "9.2.0",
     "redux": "5.0.1",
     "style-loader": "4.0.0",
+    "tailwindcss": "4.3.5",
     "typescript": "5.6.3",
     "webpack": "5.112.2",
     "webpack-cli": "6.0.1"
   },
   "dependencies": {
+    "@heroui/react": "3.2.8",
+    "@heroui/styles": "3.2.8",
+    "@internationalized/date": "3.12.4",
     "@mattermost/compass-icons": "0.1.65",
     "@mattermost/compass-ui": "0.1.0-alpha.15",
+    "@react-aria/ssr": "3.10.1",
+    "@react-aria/utils": "3.34.1",
     "core-js": "3.51.0",
     "mattermost-redux": "11.9.0",
+    "react-aria": "3.53.1",
+    "react-aria-components": "1.22.1",
     "simplebar-react": "3.3.2"
   },
   "jest": {
@@ -76,6 +87,7 @@
       "text-summary"
     ],
     "moduleNameMapper": {
+      "^.+\\.svg\\?raw$": "<rootDir>/tests/svg_raw_mock.js",
       "^.+\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$": "identity-obj-proxy",
       "^.+\\.css$": "identity-obj-proxy",
       "^.*i18n.*\\.(json)$": "<rootDir>/tests/i18n_mock.json"
@@ -90,7 +102,7 @@
       "jest-junit"
     ],
     "transformIgnorePatterns": [
-      "node_modules/(?!@mattermost/compass-ui|@mattermost/compass-icons)"
+      "node_modules/(?!@mattermost/compass-ui|@mattermost/compass-icons|@heroui|tailwind-variants|tailwind-merge|react-aria-components|react-aria|@react-aria|@react-stately|@internationalized)"
     ],
     "setupFilesAfterEnv": [
       "<rootDir>/tests/setup.tsx"

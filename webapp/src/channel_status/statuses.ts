@@ -1,9 +1,9 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
+import type {ChipVariants} from '@heroui/react/chip';
 import {defineMessages, type MessageDescriptor} from 'react-intl';
 
-import type {TagType} from '@mattermost/compass-ui/components/tag';
 import type {Channel} from '@mattermost/types/channels';
 import type {GlobalState} from '@mattermost/types/store';
 
@@ -12,7 +12,7 @@ import {haveIChannelPermission} from 'mattermost-redux/selectors/entities/roles'
 
 export type StatusOption = {
     value: string;
-    tagType: TagType;
+    color: NonNullable<ChipVariants['color']>;
     message: MessageDescriptor;
 };
 
@@ -24,9 +24,9 @@ const messages = defineMessages({
 
 // Must match the values the server accepts in server/channelstatus.
 export const STATUS_OPTIONS: StatusOption[] = [
-    {value: 'on-track', tagType: 'success', message: messages.onTrack},
-    {value: 'at-risk', tagType: 'warning', message: messages.atRisk},
-    {value: 'off-track', tagType: 'danger', message: messages.offTrack},
+    {value: 'on-track', color: 'success', message: messages.onTrack},
+    {value: 'at-risk', color: 'warning', message: messages.atRisk},
+    {value: 'off-track', color: 'danger', message: messages.offTrack},
 ];
 
 export function findStatusOption(value: string | undefined) {

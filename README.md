@@ -118,7 +118,7 @@ Planned work (the mobile app, desktop signing and updates) and open decisions ar
 
 ## Plugin requirements
 
-- Mattermost Server 11.7 or later (the oldest supported ESR)
+- Mattermost Server 12.0 or later (the first release with React 19, which HeroUI needs)
 - Go (version in `go.mod`) and Node.js (version in `.nvmrc`) to build
 - GNU Make
 

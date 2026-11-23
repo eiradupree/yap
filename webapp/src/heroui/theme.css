@@ -1,0 +1,58 @@
+/*
+ * Maps HeroUI's tokens onto the user's Mattermost theme, so HeroUI components
+ * follow whatever theme (light or dark) the user picked. Loaded after
+ * heroui.css, which scopes HeroUI's own defaults to .yap-ui.
+ */
+.yap-ui {
+    color-scheme: inherit;
+    color: var(--center-channel-color);
+    font-family: var(--font-family-body);
+
+    --font-sans: var(--font-family-body);
+    --radius: var(--radius-s);
+    --field-radius: var(--radius-s);
+
+    --background: var(--center-channel-bg);
+    --foreground: var(--center-channel-color);
+    --surface: var(--center-channel-bg);
+    --surface-foreground: var(--center-channel-color);
+    --surface-secondary: color-mix(in srgb, var(--center-channel-bg) 96%, var(--center-channel-color));
+    --surface-tertiary: color-mix(in srgb, var(--center-channel-bg) 92%, var(--center-channel-color));
+    --overlay: var(--center-channel-bg);
+    --overlay-foreground: var(--center-channel-color);
+    --muted: rgba(var(--center-channel-color-rgb), 0.75);
+
+    --default: rgba(var(--center-channel-color-rgb), 0.08);
+    --default-foreground: var(--center-channel-color);
+    --default-hover: rgba(var(--center-channel-color-rgb), 0.12);
+
+    --accent: var(--button-bg);
+    --accent-foreground: var(--button-color);
+    --focus: var(--button-bg);
+    --link: var(--link-color);
+
+    --success: var(--online-indicator);
+    --success-foreground: var(--button-color);
+    --warning: var(--away-indicator);
+    --warning-foreground: var(--center-channel-color);
+    --danger: var(--error-text);
+    --danger-foreground: var(--button-color);
+
+    /* Text on soft status backgrounds (chips, alerts). The theme's status colors are
+       too light for text on a light background (the away yellow is about 1.6:1), so
+       mix them toward the text color, which also lightens them on dark themes. */
+    --success-soft-foreground: color-mix(in srgb, var(--online-indicator) 45%, var(--center-channel-color));
+    --warning-soft-foreground: color-mix(in srgb, var(--away-indicator) 45%, var(--center-channel-color));
+    --danger-soft-foreground: color-mix(in srgb, var(--error-text) 60%, var(--center-channel-color));
+
+    /* Mattermost's fields have a visible border; HeroUI's default has none. */
+    --field-background: var(--center-channel-bg);
+    --field-foreground: var(--center-channel-color);
+    --field-placeholder: rgba(var(--center-channel-color-rgb), 0.75);
+    --field-border: rgba(var(--center-channel-color-rgb), 0.16);
+    --field-border-width: 1px;
+
+    --border: rgba(var(--center-channel-color-rgb), 0.16);
+    --separator: rgba(var(--center-channel-color-rgb), 0.08);
+    --backdrop: rgba(0, 0, 0, 0.64);
+}

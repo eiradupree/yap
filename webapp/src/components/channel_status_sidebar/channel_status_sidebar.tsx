@@ -1,18 +1,22 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
+import {Alert} from '@heroui/react/alert';
+import {Button} from '@heroui/react/button';
+import {Chip} from '@heroui/react/chip';
+import {Label} from '@heroui/react/label';
+import {ListBox} from '@heroui/react/list-box';
+import {Select} from '@heroui/react/select';
+import {Spinner} from '@heroui/react/spinner';
 import {statusReceived} from 'channel_status/state';
 import {canEditChannelStatus, findStatusOption, STATUS_OPTIONS} from 'channel_status/statuses';
 import {useChannelStatus} from 'channel_status/use_channel_status';
 import {clearChannelStatus, setChannelStatus} from 'client';
+import YapUIProvider from 'heroui/yap_ui_provider';
 import {useId, useState} from 'react';
 import {FormattedMessage, useIntl} from 'react-intl';
 import {useDispatch, useSelector} from 'react-redux';
 
-import {Button} from '@mattermost/compass-ui/components/button';
-import {SectionNotice} from '@mattermost/compass-ui/components/section-notice';
-import {Select} from '@mattermost/compass-ui/components/select';
-import {Tag} from '@mattermost/compass-ui/components/tag';
 import type {Channel} from '@mattermost/types/channels';
 import type {GlobalState} from '@mattermost/types/store';
 
@@ -29,10 +33,12 @@ export default function ChannelStatusSidebar() {
     // A new key per channel resets the form, so a save that finishes after the user
     // switches channels can't show its result in the wrong one.
     return (
-        <ChannelStatusPanel
-            key={channel.id}
-            channel={channel}
-        />
+        <YapUIProvider>
+            <ChannelStatusPanel
+                key={channel.id}
+                channel={channel}
+            />
+        </YapUIProvider>
     );
 }
 
@@ -49,13 +55,29 @@ function ChannelStatusPanel({channel}: {channel: Channel}) {
     if (error) {
         return (
             <div className='StarterTemplate-ChannelStatusSidebar'>
-                <SectionNotice
-                    type='danger'
-                    title={intl.formatMessage({id: 'channel_status.load_error', defaultMessage: 'Couldn’t load the channel status'})}
-                    description={error}
-                    primaryButtonLabel={intl.formatMessage({id: 'channel_status.retry', defaultMessage: 'Try again'})}
-                    onPrimaryAction={retry}
-                />
+                <Alert status='danger'>
+                    <Alert.Indicator/>
+                    <Alert.Content>
+                        <Alert.Title>
+                            <FormattedMessage
+                                id='channel_status.load_error'
+                                defaultMessage='Couldn’t load the channel status'
+                            />
+                        </Alert.Title>
+                        <Alert.Description>{error}</Alert.Description>
+                        <Button
+                            className='StarterTemplate-ChannelStatusSidebar__retry'
+                            variant='secondary'
+                            size='sm'
+                            onPress={retry}
+                        >
+                            <FormattedMessage
+                                id='channel_status.retry'
+                                defaultMessage='Try again'
+                            />
+                        </Button>
+                    </Alert.Content>
+                </Alert>
             </div>
         );
     }
@@ -63,7 +85,14 @@ function ChannelStatusPanel({channel}: {channel: Channel}) {
     if (status === undefined) {
         return (
             <div className='StarterTemplate-ChannelStatusSidebar'>
-                <p className='StarterTemplate-ChannelStatusSidebar__text'>
+                <p
+                    className='StarterTemplate-ChannelStatusSidebar__text StarterTemplate-ChannelStatusSidebar__loading'
+                    role='status'
+                >
+                    <Spinner
+                        size='sm'
+                        aria-hidden='true'
+                    />
                     <FormattedMessage
                         id='channel_status.loading'
                         defaultMessage='Loading…'
@@ -98,7 +127,14 @@ function ChannelStatusPanel({channel}: {channel: Channel}) {
                     defaultMessage='Show everyone in {channel} how things are going. You can also use {command}.'
                     values={{
                         channel: channel.display_name,
-                        command: <code key='command'>{'/channelstatus'}</code>,
+                        command: (
+                            <code
+                                key='command'
+                                className='StarterTemplate-ChannelStatusSidebar__command'
+                            >
+                                {'/channelstatus'}
+                            </code>
+                        ),
                     }}
                 />
             </p>
@@ -118,11 +154,16 @@ function ChannelStatusPanel({channel}: {channel: Channel}) {
                     />
                 </h3>
                 {current ? (
-                    <Tag
-                        label={intl.formatMessage(current.message)}
-                        type={current.tagType}
-                        size='small'
-                    />
+                    <Chip
+                        color={current.color}
+                        variant='soft'
+                    >
+                        <span
+                            className='StarterTemplate-ChannelStatusSidebar__dot'
+                            aria-hidden='true'
+                        />
+                        <Chip.Label>{intl.formatMessage(current.message)}</Chip.Label>
+                    </Chip>
                 ) : (
                     <span className='StarterTemplate-ChannelStatusSidebar__text'>
                         <FormattedMessage
@@ -136,25 +177,58 @@ function ChannelStatusPanel({channel}: {channel: Channel}) {
             {canEdit ? (
                 <div className='StarterTemplate-ChannelStatusSidebar__form'>
                     <Select
-                        label={intl.formatMessage({id: 'channel_status.select_label', defaultMessage: 'New status'})}
+                        fullWidth={true}
                         placeholder={intl.formatMessage({id: 'channel_status.select_placeholder', defaultMessage: 'Choose a status'})}
-                        options={STATUS_OPTIONS.map((option) => ({
-                            value: option.value,
-                            label: intl.formatMessage(option.message),
-                            leadingVisual: <span className={`StarterTemplate-ChannelStatusSidebar__dot StarterTemplate-ChannelStatusSidebar__dot--${option.value}`}/>,
-                        }))}
-                        value={selected ?? status}
-                        onChange={setSelected}
-                        disabled={saving}
-                    />
+                        value={selected ?? (status || null)}
+                        onChange={(key) => setSelected(key === null ? undefined : String(key))}
+                        isDisabled={saving}
+                    >
+                        <Label>
+                            <FormattedMessage
+                                id='channel_status.select_label'
+                                defaultMessage='New status'
+                            />
+                        </Label>
+                        <Select.Trigger>
+                            <Select.Value/>
+                            <Select.Indicator/>
+                        </Select.Trigger>
+                        <Select.Popover>
+                            <ListBox>
+                                {STATUS_OPTIONS.map((option) => {
+                                    const label = intl.formatMessage(option.message);
+                                    return (
+                                        <ListBox.Item
+                                            key={option.value}
+                                            id={option.value}
+                                            textValue={label}
+                                        >
+                                            <span
+                                                className={`StarterTemplate-ChannelStatusSidebar__dot StarterTemplate-ChannelStatusSidebar__dot--${option.value}`}
+                                                aria-hidden='true'
+                                            />
+                                            {label}
+                                            <ListBox.ItemIndicator/>
+                                        </ListBox.Item>
+                                    );
+                                })}
+                            </ListBox>
+                        </Select.Popover>
+                    </Select>
                     <div className='StarterTemplate-ChannelStatusSidebar__actions'>
                         <Button
-                            emphasis='primary'
-                            size='small'
-                            loading={saving}
-                            disabled={!selected || selected === status}
-                            onClick={() => selected && save(selected)}
+                            variant='primary'
+                            size='sm'
+                            isPending={saving}
+                            isDisabled={!selected || selected === status}
+                            onPress={() => selected && save(selected)}
                         >
+                            {saving && (
+                                <Spinner
+                                    size='sm'
+                                    color='current'
+                                />
+                            )}
                             <FormattedMessage
                                 id='channel_status.save'
                                 defaultMessage='Save'
@@ -162,10 +236,10 @@ function ChannelStatusPanel({channel}: {channel: Channel}) {
                         </Button>
                         {current && (
                             <Button
-                                emphasis='tertiary'
-                                size='small'
-                                disabled={saving}
-                                onClick={() => save('')}
+                                variant='tertiary'
+                                size='sm'
+                                isDisabled={saving}
+                                onPress={() => save('')}
                             >
                                 <FormattedMessage
                                     id='channel_status.clear'
@@ -176,11 +250,18 @@ function ChannelStatusPanel({channel}: {channel: Channel}) {
                     </div>
                     <div role='alert'>
                         {saveError && (
-                            <SectionNotice
-                                type='danger'
-                                title={intl.formatMessage({id: 'channel_status.save_error', defaultMessage: 'Couldn’t update the status'})}
-                                description={saveError}
-                            />
+                            <Alert status='danger'>
+                                <Alert.Indicator/>
+                                <Alert.Content>
+                                    <Alert.Title>
+                                        <FormattedMessage
+                                            id='channel_status.save_error'
+                                            defaultMessage='Couldn’t update the status'
+                                        />
+                                    </Alert.Title>
+                                    <Alert.Description>{saveError}</Alert.Description>
+                                </Alert.Content>
+                            </Alert>
                         )}
                     </div>
                 </div>
