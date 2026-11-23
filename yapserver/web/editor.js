@@ -8,8 +8,6 @@
 // blocks. Rendering builds DOM nodes directly and never parses HTML, so a
 // message can't inject markup.
 
-const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
-
 // ---- icons ----
 
 const svg = (body) => `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
@@ -30,73 +28,51 @@ const icons = {
   image: svg('<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="15.5" cy="9.5" r="1.5"/><path d="m3.5 16 5-5 4.5 4.5 2-2 5.5 5.5"/>'),
   file: svg('<path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5"/>'),
   camera: svg('<path d="M4 8h3l2-2.5h6L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/>'),
-  close: svg('<path d="M6 6l12 12M18 6 6 18"/>'),
   alert: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/>'),
 };
 
-function iconButton(icon, label, extraClass) {
+// iconButton makes an icon-only HeroUI button with a YapUI.Tooltip that
+// names it. variant: 'ghost' (default), 'primary', or 'toggle' for a
+// ToggleButton (pressed state shown with data-selected). b.setTip(content)
+// changes the tooltip; it's a no-op when the text hasn't changed.
+function iconButton(icon, label, extraClass, { variant = 'ghost', showWhenDisabled = false } = {}) {
   const b = document.createElement('button');
   b.type = 'button';
-  b.className = 'icon-btn' + (extraClass ? ' ' + extraClass : '');
+  b.className = (variant === 'toggle'
+    ? 'toggle-button toggle-button--ghost toggle-button--sm toggle-button--icon-only'
+    : YapUI.Button.classes({ variant, size: 'sm', isIconOnly: true }))
+    + (extraClass ? ' ' + extraClass : '');
+  b.dataset.slot = variant === 'toggle' ? 'toggle-button' : 'button';
   b.innerHTML = icons[icon]; // static markup from this file
   b.setAttribute('aria-label', label);
-  b.dataset.tip = label;
+  const tip = YapUI.Tooltip(b, { content: label, showWhenDisabled });
+  let last = label;
+  b.setTip = (content, key = typeof content === 'string' ? content : content.textContent) => {
+    if (key === last) return;
+    last = key;
+    tip.setContent(content);
+  };
+  b.tooltip = tip;
   return b;
 }
 
-function shortcutLabel(sc) {
-  if (!sc) return '';
-  const key = sc.key.toUpperCase();
-  return isMac ? `⌘${sc.shift ? '⇧' : ''}${key}` : `Ctrl+${sc.shift ? 'Shift+' : ''}${key}`;
+// tipWithKeys is tooltip content: a label and its shortcut ("Bold ⌘B").
+// keys is in YapUI.Kbd's format, e.g. 'mod+shift+x'.
+function tipWithKeys(label, keys) {
+  return YapUI.h('span', null, label, YapUI.h('kbd', { class: 'yui-tooltip__kbd', text: YapUI.Kbd.format(keys) }));
 }
 
-// ---- tooltips ----
-// Shown after a short delay on hover, and at once on keyboard focus, so they
-// work without a mouse. Every icon button gets one.
+// sentence makes a server error message read as a sentence: "too big" →
+// "Too big."
+function sentence(text) {
+  const t = String(text || '').trim();
+  if (!t) return t;
+  return t[0].toUpperCase() + t.slice(1) + (/[.!?…]$/.test(t) ? '' : '.');
+}
 
-const tooltip = (() => {
-  const el = document.createElement('div');
-  el.className = 'tooltip';
-  el.setAttribute('role', 'tooltip');
-  el.hidden = true;
-  document.addEventListener('DOMContentLoaded', () => document.body.append(el));
-  let timer = null;
-  let target = null;
-
-  function show(t) {
-    target = t;
-    el.textContent = t.dataset.tip;
-    el.hidden = false;
-    const r = t.getBoundingClientRect();
-    const w = el.offsetWidth, h = el.offsetHeight;
-    const left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2));
-    const above = r.top - h - 8;
-    el.style.left = left + 'px';
-    el.style.top = (above > 4 ? above : r.bottom + 8) + 'px';
-  }
-  function hide() {
-    clearTimeout(timer);
-    timer = null;
-    target = null;
-    el.hidden = true;
-  }
-  document.addEventListener('pointerover', (e) => {
-    const t = e.target.closest?.('[data-tip]');
-    if (t === target) return;
-    hide();
-    if (t && e.pointerType === 'mouse') timer = setTimeout(() => show(t), 300);
-  });
-  document.addEventListener('pointerdown', hide);
-  document.addEventListener('focusin', (e) => {
-    const t = e.target.closest?.('[data-tip]');
-    hide();
-    if (t && t.matches(':focus-visible')) show(t);
-  });
-  document.addEventListener('focusout', hide);
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !el.hidden) hide(); }, true);
-  window.addEventListener('scroll', hide, true);
-  return { hide, refresh: (t) => { if (target === t) show(t); } };
-})();
+function shortcutKeys(sc) {
+  return `mod+${sc.shift ? 'shift+' : ''}${sc.key}`;
+}
 
 // ---- Markdown ----
 
@@ -406,118 +382,6 @@ const md = (() => {
   return { render, plain, serialize, escapePlain, safeURL };
 })();
 
-// ---- menus ----
-// An overlay menu of actions opened from a button. Arrow keys, Home and End
-// move between items, Enter or Space picks one, a letter jumps to the item
-// starting with it, and Escape or Tab closes it.
-
-function createMenu(toggle, { label, items, note }) {
-  const pop = document.createElement('div');
-  pop.className = 'menu-pop';
-  pop.hidden = true;
-  const ul = document.createElement('ul');
-  ul.setAttribute('role', 'menu');
-  ul.setAttribute('aria-label', label);
-  ul.id = 'menu-' + Math.random().toString(36).slice(2);
-  pop.append(ul);
-  if (note) {
-    const p = document.createElement('p');
-    p.className = 'menu-note';
-    p.textContent = note;
-    pop.append(p);
-  }
-  toggle.setAttribute('aria-haspopup', 'menu');
-  toggle.setAttribute('aria-expanded', 'false');
-  toggle.setAttribute('aria-controls', ul.id);
-  document.addEventListener('DOMContentLoaded', () => document.body.append(pop));
-  if (document.readyState !== 'loading') document.body.append(pop);
-
-  let buttons = [];
-
-  function build() {
-    ul.replaceChildren();
-    buttons = [];
-    for (const item of items()) {
-      if (item.hidden) continue;
-      const li = document.createElement('li');
-      li.setAttribute('role', 'none');
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.setAttribute('role', 'menuitem');
-      b.tabIndex = -1;
-      if (item.disabled) b.setAttribute('aria-disabled', 'true');
-      const ic = document.createElement('span');
-      ic.className = 'menu-icon';
-      ic.innerHTML = icons[item.icon]; // static markup from this file
-      const text = document.createElement('span');
-      text.className = 'menu-text';
-      const l = document.createElement('span');
-      l.className = 'menu-label';
-      l.textContent = item.label;
-      const d = document.createElement('span');
-      d.className = 'menu-desc';
-      d.textContent = item.disabled || item.description;
-      text.append(l, d);
-      b.append(ic, text);
-      b.addEventListener('click', () => {
-        if (item.disabled) return;
-        close(false);
-        item.action();
-      });
-      li.append(b);
-      ul.append(li);
-      buttons.push(b);
-    }
-  }
-
-  function open(focusFirst = true) {
-    build();
-    pop.hidden = false;
-    toggle.setAttribute('aria-expanded', 'true');
-    tooltip.hide();
-    const r = toggle.getBoundingClientRect();
-    const w = pop.offsetWidth, h = pop.offsetHeight;
-    pop.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left)) + 'px';
-    // Opens upward, since the message box is at the bottom of the screen.
-    pop.style.top = (r.top - h - 8 > 8 ? r.top - h - 8 : r.bottom + 8) + 'px';
-    if (focusFirst && buttons[0]) buttons[0].focus();
-  }
-
-  function close(refocus = true) {
-    if (pop.hidden) return;
-    pop.hidden = true;
-    toggle.setAttribute('aria-expanded', 'false');
-    if (refocus) toggle.focus();
-  }
-
-  toggle.addEventListener('click', () => (pop.hidden ? open() : close()));
-  toggle.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); open(); }
-  });
-  ul.addEventListener('keydown', (e) => {
-    const i = buttons.indexOf(document.activeElement);
-    const go = (n) => { e.preventDefault(); buttons[(n + buttons.length) % buttons.length]?.focus(); };
-    if (e.key === 'ArrowDown') go(i + 1);
-    else if (e.key === 'ArrowUp') go(i - 1);
-    else if (e.key === 'Home') go(0);
-    else if (e.key === 'End') go(buttons.length - 1);
-    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
-    else if (e.key === 'Tab') close(false);
-    else if (e.key.length === 1 && /\S/.test(e.key)) {
-      const k = e.key.toLowerCase();
-      const order = [...buttons.slice(i + 1), ...buttons.slice(0, i + 1)];
-      const hit = order.find((b) => b.querySelector('.menu-label').textContent.toLowerCase().startsWith(k));
-      if (hit) { e.preventDefault(); hit.focus(); }
-    }
-  });
-  document.addEventListener('pointerdown', (e) => {
-    if (!pop.hidden && !pop.contains(e.target) && !toggle.contains(e.target)) close(false);
-  }, true);
-  window.addEventListener('resize', () => close(false));
-
-  return { open, close };
-}
-
 // ---- the editor ----
 
 const formatCommands = [
@@ -563,9 +427,10 @@ function createEditor({ placeholder, onSubmit, onCancel, onFiles, onChange }) {
       toolbar.append(sep);
       continue;
     }
-    const b = iconButton(c.icon, c.label, 'fmt');
-    b.dataset.tip = `${c.label}  ${shortcutLabel(c)}`;
-    b.setAttribute('aria-keyshortcuts', `${isMac ? 'Meta' : 'Control'}+${c.shift ? 'Shift+' : ''}${c.key.toUpperCase()}`);
+    // Disabled formats stay focusable and their tooltip says why.
+    const b = iconButton(c.icon, c.label, 'fmt', { variant: 'toggle', showWhenDisabled: true });
+    b.setTip(tipWithKeys(c.label, shortcutKeys(c)));
+    b.setAttribute('aria-keyshortcuts', `${YapUI.isMac ? 'Meta' : 'Control'}+${c.shift ? 'Shift+' : ''}${c.key.toUpperCase()}`);
     b.setAttribute('aria-pressed', 'false');
     b.tabIndex = buttons.size === 0 ? 0 : -1;
     // Keep the selection in the editor when a button is clicked.
@@ -692,16 +557,25 @@ function createEditor({ placeholder, onSubmit, onCancel, onFiles, onChange }) {
   const linkPop = document.createElement('form');
   linkPop.className = 'link-pop';
   linkPop.hidden = true;
+  linkPop.setAttribute('aria-label', 'Edit link');
+  linkPop.noValidate = true;
+  const linkId = 'link-' + Math.random().toString(36).slice(2);
   linkPop.innerHTML = `
-    <label>Text <input name="text" autocomplete="off"></label>
-    <label>Link <input name="url" type="text" inputmode="url" placeholder="https://example.com" autocomplete="off" required></label>
-    <p class="error" role="alert"></p>
+    <div class="textfield textfield--full-width" data-slot="textfield">
+      <label class="label" data-slot="label" for="${linkId}-text">Text</label>
+      <input class="input input--secondary input--full-width" data-slot="input" id="${linkId}-text" name="text" autocomplete="off">
+    </div>
+    <div class="textfield textfield--full-width" data-slot="textfield">
+      <label class="label" data-slot="label" for="${linkId}-url">Link</label>
+      <input class="input input--secondary input--full-width" data-slot="input" id="${linkId}-url" name="url" type="text" inputmode="url" placeholder="https://example.com" autocomplete="off" aria-describedby="${linkId}-error">
+      <p class="link-error" id="${linkId}-error" role="alert"></p>
+    </div>
     <div class="link-actions">
-      <button type="button" class="link remove-link">Remove link</button>
+      <button type="button" class="button button--ghost button--sm remove-link" data-slot="button">Remove link</button>
       <span></span>
-      <button type="button" class="link cancel">Cancel</button>
-      <button type="submit">Save</button>
-    </div>`; // static markup
+      <button type="button" class="button button--tertiary button--sm cancel" data-slot="button">Cancel</button>
+      <button type="submit" class="button button--primary button--sm" data-slot="button">Save</button>
+    </div>`; // static markup from this file
   let savedRange = null;
   let editingLink = null;
 
@@ -716,9 +590,15 @@ function createEditor({ placeholder, onSubmit, onCancel, onFiles, onChange }) {
     linkPop.elements.text.value = editingLink ? editingLink.textContent : s.toString();
     linkPop.elements.url.value = editingLink ? editingLink.getAttribute('href') : '';
     linkPop.querySelector('.remove-link').hidden = !editingLink;
-    linkPop.querySelector('.error').textContent = '';
+    setLinkError(null);
     linkPop.hidden = false;
     (linkPop.elements.text.value ? linkPop.elements.url : linkPop.elements.text).focus();
+  }
+
+  function setLinkError(message) {
+    linkPop.querySelector('.link-error').textContent = message || '';
+    if (message) linkPop.elements.url.setAttribute('aria-invalid', 'true');
+    else linkPop.elements.url.removeAttribute('aria-invalid');
   }
 
   function closeLinkEditor() {
@@ -750,7 +630,7 @@ function createEditor({ placeholder, onSubmit, onCancel, onFiles, onChange }) {
     if (raw && !/^[a-z][a-z0-9+.-]*:/i.test(raw)) raw = (raw.includes('@') && !raw.includes('/') ? 'mailto:' : 'https://') + raw;
     const href = md.safeURL(raw);
     if (!href) {
-      linkPop.querySelector('.error').textContent = 'Enter a web address, like example.com.';
+      setLinkError('Enter a web address, like example.com.');
       return;
     }
     const text = linkPop.elements.text.value.trim() || href;
@@ -763,7 +643,7 @@ function createEditor({ placeholder, onSubmit, onCancel, onFiles, onChange }) {
   // ---- typing, shortcuts and paste ----
 
   el.addEventListener('keydown', (e) => {
-    const mod = isMac ? e.metaKey : e.ctrlKey;
+    const mod = YapUI.isMac ? e.metaKey : e.ctrlKey;
     if (mod && !e.altKey) {
       const key = e.code.startsWith('Key') ? e.code.slice(3).toLowerCase() : e.code.startsWith('Digit') ? e.code.slice(5) : '';
       const c = formatCommands.find((x) => x.key === key && !!x.shift === e.shiftKey);
@@ -846,15 +726,15 @@ function createEditor({ placeholder, onSubmit, onCancel, onFiles, onChange }) {
       if (c.group) continue;
       const b = buttons.get(c.id);
       b.setAttribute('aria-pressed', String(!!state[c.id]));
+      b.dataset.selected = String(!!state[c.id]);
       const off = (inPre && c.id !== 'codeblock') || (inCode && c.inline && c.id !== 'code');
       if (off) {
         b.setAttribute('aria-disabled', 'true');
-        b.dataset.tip = `${c.label} isn't available in ${inPre ? 'a code block' : 'code'}`;
+        b.setTip(`${c.label} isn't available in ${inPre ? 'a code block' : 'code'}`);
       } else {
         b.removeAttribute('aria-disabled');
-        b.dataset.tip = `${c.label}  ${shortcutLabel(c)}`;
+        b.setTip(tipWithKeys(c.label, shortcutKeys(c)));
       }
-      tooltip.refresh(b);
     }
   }
   document.addEventListener('selectionchange', updateState);
@@ -936,7 +816,7 @@ function createComposer(form, { placeholder, dropZone, send, attachments = true,
     placeholder,
     onSubmit: () => form.requestSubmit(),
     onFiles: attachments ? addFiles : null,
-    onChange: () => updateSend(),
+    onChange: () => { updateSend(); setProblem(null); },
   });
 
   const foot = document.createElement('div');
@@ -945,7 +825,7 @@ function createComposer(form, { placeholder, dropZone, send, attachments = true,
   let attachBtn = null;
   if (attachments) {
     attachBtn = iconButton('paperclip', 'Attach', 'attach');
-    attachBtn.dataset.tip = 'Attach files';
+    attachBtn.setTip('Attach files');
     const imageInput = Object.assign(document.createElement('input'), { type: 'file', multiple: true, accept: imageTypes, hidden: true });
     const fileInput = Object.assign(document.createElement('input'), { type: 'file', multiple: true, hidden: true });
     const cameraInput = Object.assign(document.createElement('input'), { type: 'file', accept: 'image/*', hidden: true });
@@ -955,27 +835,34 @@ function createComposer(form, { placeholder, dropZone, send, attachments = true,
       foot.append(input);
     }
     const full = () => pending.length >= maxFiles ? `You can attach up to ${maxFiles} files to a message` : null;
-    createMenu(attachBtn, {
+    YapUI.Dropdown(attachBtn, {
       label: 'Attach',
-      note: 'You can also drag files into the message box or paste them.',
-      items: () => [
-        { icon: 'image', label: 'Upload image or GIF', description: 'PNG, JPEG, GIF or WebP, up to 10 MB. Shown in the message.', disabled: full(), action: () => imageInput.click() },
-        { icon: 'file', label: 'Upload file', description: 'Any type, up to 10 MB. Others can download it.', disabled: full(), action: () => fileInput.click() },
-        { icon: 'camera', label: 'Take photo', description: 'Use your camera.', disabled: full(), hidden: !touchDevice, action: () => cameraInput.click() },
-      ],
+      placement: 'top start',
+      class: 'attach-menu',
+      footer: 'You can also drag files into the message box or paste them.',
+      // Built on every open, so a full message shows the items disabled with the reason.
+      items: () => {
+        const why = full();
+        return [
+          { key: 'image', icon: icons.image, label: 'Upload image or GIF', description: why || 'PNG, JPEG, GIF or WebP, up to 10 MB. Shown in the message.', isDisabled: !!why },
+          { key: 'file', icon: icons.file, label: 'Upload file', description: why || 'Any type, up to 10 MB. Others can download it.', isDisabled: !!why },
+          { key: 'photo', icon: icons.camera, label: 'Take photo', description: why || 'Use your camera.', isDisabled: !!why, hidden: !touchDevice },
+        ];
+      },
+      onAction: (key) => ({ image: imageInput, file: fileInput, photo: cameraInput })[key].click(),
     });
     foot.append(attachBtn);
   }
 
   // Formatting can be hidden to save space; phones start with it hidden.
-  const fmtBtn = iconButton('format', 'Formatting', 'fmt-toggle');
+  const fmtBtn = iconButton('format', 'Formatting', 'fmt-toggle', { variant: 'toggle' });
   let showFormatting = !window.matchMedia('(max-width: 640px)').matches;
   try { const v = localStorage.getItem('yap.formatting'); if (v) showFormatting = v === 'on'; } catch {}
   function applyFormatting() {
     editor.toolbar.hidden = !showFormatting;
     fmtBtn.setAttribute('aria-pressed', String(showFormatting));
-    fmtBtn.dataset.tip = showFormatting ? 'Hide formatting' : 'Show formatting';
-    tooltip.refresh(fmtBtn);
+    fmtBtn.dataset.selected = String(showFormatting);
+    fmtBtn.setTip(showFormatting ? 'Hide formatting' : 'Show formatting');
   }
   fmtBtn.addEventListener('mousedown', (e) => e.preventDefault());
   fmtBtn.addEventListener('click', () => {
@@ -987,26 +874,32 @@ function createComposer(form, { placeholder, dropZone, send, attachments = true,
 
   const spacer = document.createElement('span');
   spacer.className = 'spacer';
-  const sendBtn = iconButton('send', submitLabel, 'send');
+  // The send button stays focusable when it can't be used, and its tooltip
+  // says why.
+  const sendBtn = iconButton('send', submitLabel, 'send', { variant: 'primary', showWhenDisabled: true });
   sendBtn.type = 'submit';
   foot.append(spacer, sendBtn);
 
+  // Problems with the message itself (too long, not sent) show under the
+  // box, where the draft is.
+  const problem = YapUI.FieldError({});
+  problem.classList.add('composer-error');
+  problem.setAttribute('role', 'alert');
+  const setProblem = (message) => problem.yui.set(message || null);
+
   box.append(editor.toolbar, editor.el, tray, foot);
-  form.append(box, editor.linkPop);
+  form.append(box, problem, editor.linkPop);
   editor.init();
   applyFormatting();
 
   function uploading() { return pending.some((p) => !p.att && !p.error); }
   function ready() { return pending.some((p) => p.att) || !editor.isEmpty(); }
 
-  // The send button stays focusable when it can't be used, and its tooltip
-  // says why.
   function updateSend() {
     const why = uploading() ? 'Wait for files to finish uploading'
       : !ready() ? (attachments ? 'Type a message or attach a file' : 'Type a message') : null;
     if (why) sendBtn.setAttribute('aria-disabled', 'true'); else sendBtn.removeAttribute('aria-disabled');
-    sendBtn.dataset.tip = why || `${submitLabel}  (Enter)`;
-    tooltip.refresh(sendBtn);
+    sendBtn.setTip(why || tipWithKeys(submitLabel, 'enter'));
   }
 
   function renderTray() {
@@ -1017,9 +910,9 @@ function createComposer(form, { placeholder, dropZone, send, attachments = true,
 
   function chip(p) {
     const li = document.createElement('li');
-    li.className = 'chip ' + (p.error ? 'failed' : p.att ? 'done' : 'uploading');
+    li.className = 'attach-item ' + (p.error ? 'failed' : p.att ? 'done' : 'uploading');
     const lead = document.createElement('span');
-    lead.className = 'chip-lead';
+    lead.className = 'attach-item__lead';
     if (p.error) lead.innerHTML = icons.alert;
     else if (p.att && p.att.content_type.startsWith('image/')) {
       const img = document.createElement('img');
@@ -1028,12 +921,12 @@ function createComposer(form, { placeholder, dropZone, send, attachments = true,
       lead.append(img);
     } else lead.innerHTML = icons.file;
     const body = document.createElement('span');
-    body.className = 'chip-body';
+    body.className = 'attach-item__body';
     const name = document.createElement('span');
-    name.className = 'chip-name';
+    name.className = 'attach-item__name';
     name.textContent = p.file.name || 'Pasted image';
     const status = document.createElement('span');
-    status.className = 'chip-status';
+    status.className = 'attach-item__status';
     if (p.error) {
       status.textContent = p.error;
       status.setAttribute('role', 'alert');
@@ -1043,7 +936,7 @@ function createComposer(form, { placeholder, dropZone, send, attachments = true,
       const pct = Math.round((p.progress || 0) * 100);
       status.textContent = `Uploading… ${pct}%`;
       const bar = document.createElement('span');
-      bar.className = 'chip-bar';
+      bar.className = 'attach-item__bar';
       bar.style.setProperty('--p', pct + '%');
       bar.setAttribute('role', 'progressbar');
       bar.setAttribute('aria-valuenow', String(pct));
@@ -1057,12 +950,16 @@ function createComposer(form, { placeholder, dropZone, send, attachments = true,
     if (p.error && p.retry) {
       const retry = document.createElement('button');
       retry.type = 'button';
-      retry.className = 'link';
+      retry.className = YapUI.Button.classes({ variant: 'tertiary', size: 'sm' });
+      retry.dataset.slot = 'button';
       retry.textContent = 'Retry';
+      retry.setAttribute('aria-label', `Retry ${p.file.name || 'attachment'}`);
       retry.addEventListener('click', () => start(p));
       li.append(retry);
     }
-    const remove = iconButton('close', `Remove ${p.file.name || 'attachment'}`, 'chip-remove');
+    const remove = YapUI.CloseButton({ ariaLabel: `Remove ${p.file.name || 'attachment'}` });
+    remove.classList.add('attach-item__remove');
+    YapUI.Tooltip(remove, { content: 'Remove' });
     remove.addEventListener('click', () => {
       pending.splice(pending.indexOf(p), 1);
       p.cancelled = true;
@@ -1100,7 +997,7 @@ function createComposer(form, { placeholder, dropZone, send, attachments = true,
     if (!attachments) return;
     for (const file of files) {
       if (pending.length >= maxFiles) {
-        alert(`You can attach up to ${maxFiles} files to a message.`);
+        YapUI.toast.warning({ title: `You can attach up to ${maxFiles} files to a message.`, description: 'The rest weren\'t added.' });
         break;
       }
       const p = { file, att: null, error: null, progress: 0 };
@@ -1148,9 +1045,10 @@ function createComposer(form, { placeholder, dropZone, send, attachments = true,
     if (sendBtn.getAttribute('aria-disabled') === 'true') return;
     const markdown = editor.getMarkdown();
     if ([...markdown].length > 4000) {
-      alert('Messages can be up to 4,000 characters, including formatting.');
+      setProblem('Messages can be up to 4,000 characters, including formatting. Shorten it, then send.');
       return;
     }
+    setProblem(null);
     const sent = pending.filter((p) => p.att);
     const failed = pending.filter((p) => !p.att);
     pending.splice(0, pending.length, ...failed);
@@ -1162,7 +1060,7 @@ function createComposer(form, { placeholder, dropZone, send, attachments = true,
       editor.setMarkdown(markdown);
       pending.unshift(...sent);
       renderTray();
-      alert(err.message);
+      setProblem(`Message not sent. ${sentence(err.message)}`);
     }
     editor.focus();
   });

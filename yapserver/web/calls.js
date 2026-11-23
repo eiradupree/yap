@@ -15,10 +15,10 @@
 
   // ---- page elements ----
 
-  const startAudio = button('Call', 'call-start', () => join(false));
-  const startVideo = button('Video', 'call-start', () => join(true));
-  startAudio.title = 'Start or join a voice call in this channel';
-  startVideo.title = 'Start or join a video call in this channel';
+  const startAudio = button('Call', 'secondary', () => join(false));
+  const startVideo = button('Video', 'secondary', () => join(true));
+  YapUI.Tooltip(startAudio, { content: 'Start a voice call in this channel' });
+  YapUI.Tooltip(startVideo, { content: 'Start a video call in this channel' });
   const headButtons = document.createElement('span');
   headButtons.className = 'call-buttons';
   headButtons.hidden = true;
@@ -29,7 +29,7 @@
   banner.className = 'call-banner';
   banner.hidden = true;
   const bannerText = document.createElement('span');
-  banner.append(bannerText, button('Join', '', () => join(false)), button('Join with video', 'link', () => join(true)));
+  banner.append(bannerText, button('Join', 'primary', () => join(false)), button('Join with video', 'secondary', () => join(true)));
 
   const stage = document.createElement('section');
   stage.className = 'call-stage';
@@ -44,12 +44,13 @@
   grid.className = 'call-grid';
   const controls = document.createElement('div');
   controls.className = 'call-controls';
-  const micBtn = button('Mute', '', toggleMic);
-  const camBtn = button('Camera on', '', toggleCamera);
-  const shareBtn = button('Share screen', '', toggleShare);
-  const audioBtn = button('Turn on sound', '', () => room && room.startAudio());
+  const micBtn = button('Mute', 'secondary', toggleMic);
+  const camBtn = button('Camera on', 'secondary', toggleCamera);
+  const shareBtn = button('Share screen', 'secondary', toggleShare);
+  const audioBtn = button('Turn on sound', 'primary', () => room && room.startAudio());
   audioBtn.hidden = true;
   const leaveBtn = button('Leave call', 'danger', hangUp);
+  leaveBtn.classList.add('call-leave');
   controls.append(micBtn, camBtn, shareBtn, audioBtn, leaveBtn);
   if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) shareBtn.hidden = true;
   const audioSink = document.createElement('div');
@@ -58,13 +59,20 @@
 
   $('messages').before(stage, banner);
 
-  function button(label, cls, onClick) {
+  // A HeroUI button (YapUI.Button's classes). Disabled buttons use
+  // aria-disabled, so they stay focusable; clicks on them are ignored.
+  function button(label, variant, onClick) {
     const b = document.createElement('button');
     b.type = 'button';
+    b.className = YapUI.Button.classes({ variant, size: 'sm' });
+    b.dataset.slot = 'button';
     b.textContent = label;
-    if (cls) b.className = cls;
-    b.addEventListener('click', onClick);
+    b.addEventListener('click', (e) => { if (b.getAttribute('aria-disabled') !== 'true') onClick(e); });
     return b;
+  }
+
+  function setDisabled(b, off) {
+    if (off) b.setAttribute('aria-disabled', 'true'); else b.removeAttribute('aria-disabled');
   }
 
   // ---- call presence ----
@@ -119,17 +127,23 @@
     headButtons.hidden = !enabled || !ch || !ch.joined || inThisCall || people.length > 0;
     banner.hidden = !enabled || !ch || !ch.joined || inThisCall || people.length === 0;
     if (!banner.hidden) bannerText.textContent = `On a call: ${names(people)}`;
-    for (const b of banner.querySelectorAll('button')) b.disabled = joining || !!room;
-    startAudio.disabled = startVideo.disabled = joining || !!room;
+    for (const b of [...banner.querySelectorAll('button'), startAudio, startVideo]) setDisabled(b, joining || !!room);
     markChannels();
   }
 
   // Adds a marker to sidebar channels that have a call going.
   function markChannels() {
-    const buttons = $('channels').querySelectorAll('button');
-    for (const b of buttons) {
-      const ch = state.channels.find((c) => '# ' + c.name === b.firstChild?.textContent);
-      b.classList.toggle('has-call', !!ch && calls.has(ch.id));
+    for (const b of $('channels').querySelectorAll('button[data-channel-id]')) {
+      const id = Number(b.dataset.channelId);
+      const on = calls.has(id);
+      b.classList.toggle('has-call', on);
+      let marker = b.querySelector('.call-marker');
+      if (on && !marker) {
+        marker = document.createElement('span');
+        marker.className = 'call-marker yui-visually-hidden';
+        marker.textContent = ', call in progress';
+        b.append(marker);
+      } else if (!on && marker) marker.remove();
     }
   }
   new MutationObserver(() => enabled && markChannels()).observe($('channels'), { childList: true });
@@ -156,7 +170,7 @@
     } catch (err) {
       if (r) r.disconnect();
       cleanup();
-      alert(`Couldn't join the call: ${err.message || err}`);
+      YapUI.toast.danger({ title: "Couldn't join the call.", description: sentence(err.message || String(err)) });
     } finally {
       joining = false;
       render();
@@ -229,7 +243,7 @@
     r.on(E.Disconnected, (reason) => {
       if (room !== r) return;
       cleanup();
-      if (reason === LK.DisconnectReason?.PARTICIPANT_REMOVED) alert('You were removed from the call.');
+      if (reason === LK.DisconnectReason?.PARTICIPANT_REMOVED) YapUI.toast.warning('You were removed from the call.');
     });
   }
 
@@ -290,6 +304,8 @@
     const me = room.localParticipant;
     micBtn.textContent = me.isMicrophoneEnabled ? 'Mute' : 'Unmute';
     micBtn.classList.toggle('off', !me.isMicrophoneEnabled);
+    micBtn.classList.toggle('button--danger-soft', !me.isMicrophoneEnabled);
+    micBtn.classList.toggle('button--secondary', me.isMicrophoneEnabled);
     camBtn.textContent = me.isCameraEnabled ? 'Camera off' : 'Camera on';
     shareBtn.textContent = me.isScreenShareEnabled ? 'Stop sharing' : 'Share screen';
   }
