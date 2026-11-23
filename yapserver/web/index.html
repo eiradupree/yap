@@ -4,8 +4,26 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Yap</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="vendor/heroui/heroui.css">
+  <link rel="stylesheet" href="ui/theme.css">
+  <link rel="stylesheet" href="ui/actions.css">
+  <link rel="stylesheet" href="ui/display.css">
+  <link rel="stylesheet" href="ui/overlays.css">
+  <link rel="stylesheet" href="ui/menus.css">
+  <link rel="stylesheet" href="ui/dialogs.css">
+  <link rel="stylesheet" href="ui/toast.css">
+  <link rel="stylesheet" href="ui/forms.css">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="calls.css">
+  <script src="ui/core.js" defer></script>
+  <script src="ui/actions.js" defer></script>
+  <script src="ui/display.js" defer></script>
+  <script src="ui/overlays.js" defer></script>
+  <script src="ui/menus.js" defer></script>
+  <script src="ui/dialogs.js" defer></script>
+  <script src="ui/toast.js" defer></script>
+  <script src="ui/forms.js" defer></script>
   <script src="editor.js" defer></script>
   <script src="app.js" defer></script>
   <script src="vendor/livekit-client.umd.js" defer></script>
@@ -13,46 +31,43 @@
 </head>
 <body>
   <main id="auth" class="auth" hidden>
-    <form id="auth-form" class="card">
+    <div class="auth-card">
       <h1>Yap</h1>
       <p id="auth-sub" class="muted">Sign in to continue</p>
-      <label>Username <input id="username" name="username" autocomplete="username" required></label>
-      <label>Password <input id="password" name="password" type="password" autocomplete="current-password" required></label>
-      <label id="invite-row" hidden>Invite code <input id="invite" name="invite" autocomplete="off"></label>
-      <p id="auth-error" class="error" role="alert"></p>
-      <button type="submit" id="auth-submit">Sign in</button>
-      <button type="button" id="auth-toggle" class="link">Need an account? Create one</button>
-    </form>
+      <!-- app.js builds #auth-form here with YapUI.Form -->
+    </div>
   </main>
 
   <div id="app" class="app" hidden>
-    <aside class="sidebar">
+    <aside class="sidebar" aria-label="Channels and account">
       <header class="sidebar-head">
-        <strong>Yap</strong>
-        <button id="logout" class="link" type="button">Sign out</button>
+        <strong class="brand">Yap</strong>
+        <button id="logout" class="button button--ghost button--sm" data-slot="button" type="button">Sign out</button>
       </header>
       <p id="me" class="muted me"></p>
       <div class="sidebar-links">
-        <button id="account" class="link" type="button">Account</button>
-        <button id="members" class="link" type="button" hidden>Members</button>
+        <button id="account" class="button button--ghost button--sm" data-slot="button" type="button">Account</button>
+        <button id="members" class="button button--ghost button--sm" data-slot="button" type="button" hidden>Members</button>
       </div>
-      <button id="notify" class="link notify" type="button" hidden>Turn on notifications</button>
-      <h2>Channels</h2>
-      <ul id="channels" class="channels"></ul>
-      <form id="new-channel" class="new-channel">
-        <input id="new-channel-name" placeholder="new-channel" maxlength="32" aria-label="New channel name">
-        <button type="submit" title="Create channel">+</button>
+      <button id="notify" class="button button--secondary button--sm notify" data-slot="button" type="button" hidden>Turn on notifications</button>
+      <h2 id="channels-heading">Channels</h2>
+      <ul id="channels" class="channels" aria-labelledby="channels-heading"></ul>
+      <form id="new-channel" class="new-channel" novalidate>
+        <div class="new-channel-row">
+          <input id="new-channel-name" class="input input--primary" data-slot="input" placeholder="new-channel" maxlength="32" aria-label="New channel name" aria-describedby="new-channel-error" autocomplete="off" spellcheck="false">
+          <button id="new-channel-submit" type="submit" class="button button--secondary button--icon-only button--md" data-slot="button" aria-label="Create channel"></button>
+        </div>
       </form>
     </aside>
-    <section class="chat">
+    <section class="chat" aria-label="Messages">
       <header class="chat-head">
         <h1 id="channel-title"># </h1>
-        <span id="conn" class="conn" title="Live updates"></span>
-        <button id="leave" class="link" type="button">Leave</button>
+        <span id="conn" class="conn"></span>
+        <button id="leave" class="button button--ghost button--sm" data-slot="button" type="button">Leave</button>
       </header>
       <div id="join-banner" class="join-banner" hidden>
         <p>You're not in this channel.</p>
-        <button id="join" type="button">Join channel</button>
+        <button id="join" class="button button--primary" data-slot="button" type="button">Join channel</button>
       </div>
       <ol id="messages" class="messages" aria-live="polite"></ol>
       <form id="composer" class="composer"></form>
@@ -60,41 +75,11 @@
     <aside id="thread" class="thread" hidden aria-label="Thread">
       <header class="chat-head">
         <h1>Thread</h1>
-        <button id="thread-close" class="link" type="button">Close</button>
+        <button id="thread-close" class="close-button close-button--default" data-slot="close-button" type="button" aria-label="Close thread"></button>
       </header>
       <ol id="thread-messages" class="messages" aria-live="polite"></ol>
       <form id="thread-composer" class="composer"></form>
     </aside>
   </div>
-
-  <dialog id="account-dialog" class="dialog">
-    <header><h2>Account</h2><button class="link close" type="button">Close</button></header>
-    <form id="password-form" class="card-form">
-      <h3>Change password</h3>
-      <label>Current password <input id="current-password" type="password" autocomplete="current-password" required></label>
-      <label>New password <input id="new-password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required></label>
-      <p id="password-error" class="error" role="alert"></p>
-      <p id="password-ok" class="ok" role="status"></p>
-      <button type="submit">Change password</button>
-    </form>
-    <form id="delete-form" class="card-form danger">
-      <h3>Delete account</h3>
-      <p class="muted">Deletes your account and every message you've posted.</p>
-      <label>Password <input id="delete-password" type="password" autocomplete="current-password" required></label>
-      <p id="delete-error" class="error" role="alert"></p>
-      <button type="submit">Delete my account</button>
-    </form>
-  </dialog>
-
-  <div id="emoji-picker" class="emoji-picker" role="dialog" aria-label="Add reaction" hidden>
-    <div class="emoji-grid"></div>
-    <input class="emoji-any" placeholder="Or type any emoji" aria-label="Any emoji" maxlength="16">
-  </div>
-
-  <dialog id="members-dialog" class="dialog">
-    <header><h2>Members</h2><button class="link close" type="button">Close</button></header>
-    <p id="members-error" class="error" role="alert"></p>
-    <ul id="member-list" class="member-list"></ul>
-  </dialog>
 </body>
 </html>

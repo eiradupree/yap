@@ -2,6 +2,20 @@
 
 const $ = (id) => document.getElementById(id);
 
+// The UI library (web/ui/) loads first; follow the OS light/dark setting.
+YapUI.theme.follow();
+const h = YapUI.h;
+
+// Modals open right now, so signing out can close them.
+const openModals = new Set();
+function openModal(options, id) {
+  const m = YapUI.Modal.open(options);
+  if (id) m.el.id = id;
+  openModals.add(m);
+  m.closed.then(() => openModals.delete(m));
+  return m;
+}
+
 const state = {
   me: null,
   channels: [],
@@ -39,40 +53,67 @@ api('GET', '/api/config').then((cfg) => {
   setAuthMode(registering);
 }).catch(() => {});
 
+// The sign-in form. Fields validate when you leave them and on submit; the
+// stricter sign-up rules (the server's) apply only when creating an account.
+const authFields = {
+  username: YapUI.TextField({
+    label: 'Username', id: 'username', name: 'username', autocomplete: 'username', isRequired: true,
+    necessityIndicator: null, maxLength: 32, spellcheck: false, autoCapitalize: 'none', fullWidth: true, variant: 'secondary',
+    validate: (v) => !registering || /^[A-Za-z0-9_.-]{3,32}$/.test(v.trim()) ? null : "Use 3–32 letters, digits, '.', '_' or '-'",
+  }),
+  password: YapUI.TextField({
+    label: 'Password', id: 'password', name: 'password', type: 'password', autocomplete: 'current-password',
+    isRequired: true, necessityIndicator: null, maxLength: 72, fullWidth: true, variant: 'secondary',
+    validate: (v) => !registering || (v.length >= 8 && v.length <= 72) ? null : 'Use 8–72 characters',
+  }),
+  invite: YapUI.TextField({
+    label: 'Invite code', id: 'invite', name: 'invite', autocomplete: 'off', isRequired: true,
+    necessityIndicator: null, spellcheck: false, autoCapitalize: 'none', fullWidth: true, variant: 'secondary',
+  }),
+};
+authFields.invite.id = 'invite-row';
+
+const authToggle = h('button', { type: 'button', id: 'auth-toggle', class: YapUI.Button.classes({ variant: 'ghost', fullWidth: true }), 'data-slot': 'button' });
+authToggle.addEventListener('click', () => setAuthMode(!registering));
+
+const authForm = YapUI.Form({
+  id: 'auth-form',
+  class: 'auth-form',
+  submitLabel: 'Sign in',
+  children: [authFields.username, authFields.password, authFields.invite],
+  actions: authToggle,
+  async onSubmit(values) {
+    const creds = { username: values.username.trim(), password: values.password };
+    if (registering && inviteOnly) creds.invite = values.invite.trim();
+    state.me = await api('POST', registering ? '/api/register' : '/api/login', creds);
+    authFields.password.yui.setValue('');
+    authFields.invite.yui.setValue('');
+    setAuthMode(false); // so a later sign-out shows sign-in, not sign-up
+    await startApp();
+  },
+});
+authForm.yui.submitButton.id = 'auth-submit';
+authForm.yui.submitButton.classList.add('button--full-width');
+document.querySelector('#auth .auth-card').append(authForm);
+
 function showAuth() {
   $('app').hidden = true;
   $('auth').hidden = false;
-  $('username').focus();
+  authFields.username.yui.focus();
 }
 
 function setAuthMode(reg) {
   registering = reg;
   $('auth-sub').textContent = reg ? 'Create your account' : 'Sign in to continue';
   $('auth-submit').textContent = reg ? 'Create account' : 'Sign in';
-  $('auth-toggle').textContent = reg ? 'Have an account? Sign in' : 'Need an account? Create one';
-  $('password').autocomplete = reg ? 'new-password' : 'current-password';
-  $('invite-row').hidden = !(reg && inviteOnly);
-  $('invite').required = reg && inviteOnly;
-  $('auth-error').textContent = '';
+  authToggle.textContent = reg ? 'Have an account? Sign in' : 'Need an account? Create one';
+  authFields.password.yui.input.autocomplete = reg ? 'new-password' : 'current-password';
+  const invite = reg && inviteOnly;
+  authFields.invite.hidden = !invite;
+  authFields.invite.yui.setDisabled(!invite); // the form skips disabled fields
+  for (const f of authForm.yui.fields()) f.yui.setError(null);
+  authForm.yui.setSummary(null);
 }
-
-$('auth-toggle').addEventListener('click', () => setAuthMode(!registering));
-
-$('auth-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  $('auth-error').textContent = '';
-  try {
-    const creds = { username: $('username').value.trim(), password: $('password').value };
-    if (registering && inviteOnly) creds.invite = $('invite').value.trim();
-    state.me = await api('POST', registering ? '/api/register' : '/api/login', creds);
-    $('password').value = '';
-    $('invite').value = '';
-    setAuthMode(false); // so a later sign-out shows sign-in, not sign-up
-    await startApp();
-  } catch (err) {
-    $('auth-error').textContent = err.message;
-  }
-});
 
 $('logout').addEventListener('click', async () => {
   try { await api('POST', '/api/logout', {}); } catch {}
@@ -87,7 +128,7 @@ function signedOut() {
   closeThread();
   closePicker();
   state.unread.clear();
-  for (const d of document.querySelectorAll('dialog[open]')) d.close();
+  for (const m of [...openModals]) m.close();
   updateTitle();
   setAuthMode(false);
   showAuth();
@@ -95,88 +136,157 @@ function signedOut() {
 
 // ---- account ----
 
+// The account dialog is built fresh each time it opens, so it starts empty.
 $('account').addEventListener('click', () => {
-  for (const f of $('account-dialog').querySelectorAll('form')) f.reset();
-  for (const p of $('account-dialog').querySelectorAll('.error, .ok')) p.textContent = '';
-  $('account-dialog').showModal();
-});
+  const passwordForm = YapUI.Form({
+    id: 'password-form',
+    class: 'account-form',
+    submitLabel: 'Change password',
+    children: [
+      // Tells password managers which account this is.
+      h('input', { type: 'text', name: 'username', autocomplete: 'username', value: state.me.username, hidden: true }),
+      YapUI.TextField({ label: 'Current password', id: 'current-password', name: 'current_password', type: 'password', autocomplete: 'current-password', isRequired: true, necessityIndicator: null, fullWidth: true, variant: 'secondary' }),
+      YapUI.TextField({
+        label: 'New password', id: 'new-password', name: 'new_password', type: 'password', autocomplete: 'new-password',
+        isRequired: true, necessityIndicator: null, maxLength: 72, fullWidth: true, variant: 'secondary', description: '8–72 characters',
+        validate: (v) => v.length >= 8 && v.length <= 72 ? null : 'Use 8–72 characters',
+      }),
+    ],
+    async onSubmit(v) {
+      await api('POST', '/api/me/password', { current_password: v.current_password, new_password: v.new_password });
+      passwordForm.yui.reset();
+      return 'Password changed. Your other devices have been signed out.';
+    },
+  });
 
-$('password-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  $('password-error').textContent = '';
-  $('password-ok').textContent = '';
-  try {
-    await api('POST', '/api/me/password', {
-      current_password: $('current-password').value,
-      new_password: $('new-password').value,
-    });
-    $('password-form').reset();
-    $('password-ok').textContent = 'Password changed. Your other devices have been signed out.';
-  } catch (err) {
-    $('password-error').textContent = err.message;
-  }
-});
+  const deleteForm = YapUI.Form({
+    id: 'delete-form',
+    class: 'account-form',
+    submitLabel: 'Delete my account',
+    description: "Deletes your account and every message you've posted.",
+    children: [
+      YapUI.TextField({ label: 'Password', id: 'delete-password', name: 'password', type: 'password', autocomplete: 'current-password', isRequired: true, necessityIndicator: null, fullWidth: true, variant: 'secondary' }),
+    ],
+    async onSubmit(v) {
+      const ok = await YapUI.AlertDialog.confirm({
+        title: `Delete the account ${state.me.username}?`,
+        description: "Your account and all its messages will be deleted. This can't be undone.",
+        status: 'danger',
+        confirmLabel: 'Delete account',
+      });
+      if (!ok) return;
+      try {
+        await api('DELETE', '/api/me', { password: v.password });
+      } catch (err) {
+        throw { fields: { password: err.message } }; // shown under the field
+      }
+      signedOut();
+      YapUI.toast.success('Account deleted.');
+    },
+  });
+  deleteForm.yui.submitButton.className = YapUI.Button.classes({ variant: 'danger' });
 
-$('delete-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  $('delete-error').textContent = '';
-  if (!confirm(`Delete the account ${state.me.username} and all its messages? This can't be undone.`)) return;
-  try {
-    await api('DELETE', '/api/me', { password: $('delete-password').value });
-    signedOut();
-  } catch (err) {
-    $('delete-error').textContent = err.message;
-  }
+  openModal({
+    title: 'Account',
+    class: 'account-dialog',
+    body: [
+      h('section', { class: 'account-section', 'aria-labelledby': 'password-heading' },
+        h('h3', { id: 'password-heading', text: 'Change password' }), passwordForm),
+      h('section', { class: 'account-section danger-zone', 'aria-labelledby': 'delete-heading' },
+        h('h3', { id: 'delete-heading', text: 'Delete account' }), deleteForm),
+    ],
+  }, 'account-dialog');
 });
 
 // ---- admin ----
 
+const members = { list: null, error: null };
+
 $('members').addEventListener('click', async () => {
-  $('members-error').textContent = '';
-  $('members-dialog').showModal();
+  members.error = h('div', { id: 'members-error', class: 'members-error' });
+  members.list = h('ul', { id: 'member-list', class: 'member-list', 'aria-label': 'Members', 'aria-busy': 'true' });
+  openModal({ title: 'Members', class: 'members-dialog', body: [members.error, members.list] }, 'members-dialog');
   await loadMembers();
 });
 
+function showMembersError(message) {
+  members.error.replaceChildren(message
+    ? YapUI.Alert({ status: 'danger', role: 'alert', title: message })
+    : '');
+}
+
 async function loadMembers() {
-  const ul = $('member-list');
   try {
     const users = await api('GET', '/api/admin/users');
-    ul.replaceChildren(...users.map(memberRow));
+    members.list.replaceChildren(...users.map(memberRow));
+    members.list.removeAttribute('aria-busy');
   } catch (err) {
-    $('members-error').textContent = err.message;
+    showMembersError(err.message);
   }
 }
 
 function memberRow(u) {
-  const li = document.createElement('li');
-  const name = document.createElement('span');
-  name.textContent = u.username;
-  const info = document.createElement('span');
-  info.className = 'muted';
-  info.textContent = u.admin ? 'admin' : u.banned ? 'banned' : 'joined ' + new Date(u.created_at).toLocaleDateString();
-  li.append(name, info);
+  const li = h('li', null,
+    YapUI.Avatar({ name: u.username, alt: '', size: 'sm', variant: 'soft', color: avatarColor(u.username) }),
+    h('span', { class: 'member-name', text: u.username }),
+    h('span', { class: 'member-end' },
+      u.admin ? YapUI.Chip({ children: 'Admin', color: 'accent', variant: 'soft', size: 'sm' })
+        : u.banned ? YapUI.Chip({ children: 'Banned', color: 'danger', variant: 'soft', size: 'sm' })
+          : h('span', { class: 'muted member-info', text: 'Joined ' + new Date(u.created_at).toLocaleDateString() })));
   if (!u.admin) {
-    li.append(actionButton(u.banned ? 'Unban' : 'Ban', async () => {
-      $('members-error').textContent = '';
-      try {
-        if (u.banned) {
-          await api('POST', `/api/admin/users/${u.id}/unban`, {});
-        } else {
-          if (!confirm(`Ban ${u.username}? They'll be signed out and can't sign in again until unbanned.`)) return;
-          const purge = confirm(`Also delete everything ${u.username} has posted? Cancel keeps their messages.`);
-          await api('POST', `/api/admin/users/${u.id}/ban`, { delete_messages: purge });
-        }
-        await loadMembers();
-      } catch (err) {
-        $('members-error').textContent = err.message;
-      }
-    }));
+    const b = YapUI.Button({
+      children: u.banned ? 'Unban' : 'Ban',
+      variant: u.banned ? 'secondary' : 'danger-soft',
+      size: 'sm',
+      ariaLabel: `${u.banned ? 'Unban' : 'Ban'} ${u.username}`,
+      onPress: () => (u.banned ? unban(u) : ban(u)),
+    });
+    li.lastChild.append(b);
   }
   return li;
 }
 
-for (const d of document.querySelectorAll('dialog')) {
-  d.querySelector('.close').addEventListener('click', () => d.close());
+async function unban(u) {
+  showMembersError(null);
+  try {
+    await api('POST', `/api/admin/users/${u.id}/unban`, {});
+    await loadMembers();
+    YapUI.toast.success(`${u.username} unbanned.`);
+  } catch (err) {
+    showMembersError(err.message);
+  }
+}
+
+// One dialog for both questions: ban, and whether to delete their messages.
+async function ban(u) {
+  showMembersError(null);
+  const purge = YapUI.Checkbox({
+    label: `Also delete everything ${u.username} has posted`,
+    description: "Their messages, replies and reactions. This can't be undone.",
+  });
+  const ok = await YapUI.AlertDialog.confirm({
+    title: `Ban ${u.username}?`,
+    description: "They'll be signed out and can't sign in again until unbanned.",
+    status: 'danger',
+    confirmLabel: 'Ban',
+    body: purge,
+  });
+  if (!ok) return;
+  try {
+    await api('POST', `/api/admin/users/${u.id}/ban`, { delete_messages: purge.yui.isSelected });
+    await loadMembers();
+    YapUI.toast.success(purge.yui.isSelected ? `${u.username} banned and their messages deleted.` : `${u.username} banned.`);
+  } catch (err) {
+    showMembersError(err.message);
+  }
+}
+
+// A stable avatar color for each name.
+const avatarColors = ['accent', 'success', 'warning', 'danger', 'default'];
+function avatarColor(name) {
+  let n = 0;
+  for (const c of name) n = (n * 31 + c.codePointAt(0)) >>> 0;
+  return avatarColors[n % avatarColors.length];
 }
 
 // ---- channels ----
@@ -190,30 +300,48 @@ function renderChannels() {
   const ul = $('channels');
   ul.replaceChildren();
   for (const ch of state.channels) {
-    const li = document.createElement('li');
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = '# ' + ch.name;
-    if (ch.id === state.current) b.classList.add('active');
+    const b = h('button', { type: 'button', class: 'channel', data: { channelId: ch.id } }, '# ' + ch.name);
+    if (ch.id === state.current) { b.classList.add('active'); b.setAttribute('aria-current', 'page'); }
     if (!ch.joined) b.classList.add('not-joined');
-    if (state.unread.get(ch.id)) b.classList.add('unread');
+    const unread = state.unread.get(ch.id);
+    if (unread) {
+      b.classList.add('unread');
+      b.append(YapUI.Badge({ children: unread > 99 ? '99+' : String(unread), label: unread === 1 ? '1 unread message' : `${unread} unread messages`, color: 'accent', size: 'sm', class: 'channel-badge' }));
+    }
     b.addEventListener('click', () => openChannel(ch.id));
-    li.append(b);
-    ul.append(li);
+    ul.append(h('li', null, b));
   }
 }
+
+// Creating a channel: errors show under the box, not in a dialog.
+$('new-channel-submit').innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>'; // static markup
+YapUI.Tooltip($('new-channel-submit'), { content: 'Create channel' });
+const newChannelError = YapUI.FieldError({ id: 'new-channel-error' });
+$('new-channel').append(newChannelError);
+function setNewChannelError(message) {
+  newChannelError.yui.set(message);
+  const input = $('new-channel-name');
+  if (message) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid');
+}
+$('new-channel-name').addEventListener('input', () => setNewChannelError(null));
 
 $('new-channel').addEventListener('submit', async (e) => {
   e.preventDefault();
   const name = $('new-channel-name').value.trim();
-  if (!name) return;
+  if (!name) {
+    setNewChannelError('Enter a name for the channel');
+    $('new-channel-name').focus();
+    return;
+  }
+  setNewChannelError(null);
   try {
     const ch = await api('POST', '/api/channels', { name });
     $('new-channel-name').value = '';
     await loadChannels();
     openChannel(ch.id);
   } catch (err) {
-    alert(err.message);
+    setNewChannelError(sentence(err.message));
+    $('new-channel-name').focus();
   }
 });
 
@@ -237,6 +365,7 @@ async function openChannel(id, { keepThread = false } = {}) {
   $('join-banner').hidden = joined;
   $('composer').hidden = !joined;
   $('leave').hidden = !joined || (ch && ch.name === 'general');
+  placeToasts();
   window.yapCalls?.channelOpened();
   if (!joined) return;
   try {
@@ -251,15 +380,31 @@ async function openChannel(id, { keepThread = false } = {}) {
 
 $('join').addEventListener('click', async () => {
   const id = state.current;
-  await api('POST', `/api/channels/${id}/join`, {});
+  try {
+    await api('POST', `/api/channels/${id}/join`, {});
+  } catch (err) {
+    YapUI.toast.danger({ title: "Couldn't join the channel.", description: sentence(err.message) });
+    return;
+  }
   await loadChannels();
   openChannel(id);
 });
 
 $('leave').addEventListener('click', async () => {
   const ch = currentChannel();
-  if (!ch || !confirm(`Leave #${ch.name}?`)) return;
-  await api('POST', `/api/channels/${ch.id}/leave`, {});
+  if (!ch) return;
+  const ok = await YapUI.AlertDialog.confirm({
+    title: `Leave #${ch.name}?`,
+    description: "You'll stop getting its messages. You can join again from the channel list.",
+    confirmLabel: 'Leave',
+  });
+  if (!ok) return;
+  try {
+    await api('POST', `/api/channels/${ch.id}/leave`, {});
+  } catch (err) {
+    YapUI.toast.danger({ title: "Couldn't leave the channel.", description: sentence(err.message) });
+    return;
+  }
   await loadChannels();
   const general = state.channels.find((c) => c.name === 'general');
   openChannel(general ? general.id : state.channels[0]?.id);
@@ -366,8 +511,11 @@ function messageItem(m, view, group) {
   li.dataset.id = m.id;
   // Group consecutive messages from one person within 5 minutes.
   if (m.user_id !== group.author || m.created_at - group.time > 5 * 60 * 1000) {
+    li.classList.add('first');
     const meta = document.createElement('div');
     meta.className = 'meta';
+    // The name is printed next to it, so the avatar is decorative.
+    const avatar = YapUI.Avatar({ name: m.username, alt: '', size: 'sm', variant: 'soft', color: avatarColor(m.username), class: 'msg-avatar' });
     const who = document.createElement('span');
     who.className = 'author';
     who.textContent = m.username;
@@ -375,7 +523,7 @@ function messageItem(m, view, group) {
     when.className = 'time';
     when.dateTime = new Date(m.created_at).toISOString();
     when.textContent = formatTime(m.created_at);
-    meta.append(who, when);
+    meta.append(avatar, who, when);
     li.append(meta);
   }
   if (m.body) {
@@ -405,8 +553,10 @@ function messageItem(m, view, group) {
 
   const actions = document.createElement('div');
   actions.className = 'actions';
-  const react = actionButton('React', (e) => openPicker(e.currentTarget, (emoji) => toggleReaction(m, emoji, true)));
-  react.title = 'Add reaction';
+  actions.setAttribute('role', 'toolbar');
+  actions.setAttribute('aria-label', 'Message actions');
+  const react = actionButton('React', null);
+  attachPicker(react, (emoji) => toggleReaction(m, emoji, true));
   actions.append(react);
   if (view === views.main) actions.append(actionButton('Reply', () => openThread(m.id)));
   const mine = m.user_id === state.me.id;
@@ -465,9 +615,11 @@ function reactionBar(m) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'reaction' + (mine ? ' mine' : '');
-    b.title = r.users.map((u) => u.username).join(', ');
+    b.dataset.emoji = r.emoji;
+    const who = r.users.map((u) => u.username).join(', ');
     b.setAttribute('aria-pressed', String(mine));
-    b.setAttribute('aria-label', `${r.emoji} ${r.users.length}, from ${b.title}`);
+    b.setAttribute('aria-label', `${r.emoji} ${r.users.length}, from ${who}`);
+    YapUI.Tooltip(b, { content: who });
     const e = document.createElement('span');
     e.textContent = r.emoji;
     const n = document.createElement('span');
@@ -481,9 +633,9 @@ function reactionBar(m) {
   add.type = 'button';
   add.className = 'reaction add';
   add.textContent = '+';
-  add.title = 'Add reaction';
   add.setAttribute('aria-label', 'Add reaction');
-  add.addEventListener('click', (e) => openPicker(e.currentTarget, (emoji) => toggleReaction(m, emoji, true)));
+  attachPicker(add, (emoji) => toggleReaction(m, emoji, true));
+  YapUI.Tooltip(add, { content: 'Add reaction' });
   div.append(add);
   return div;
 }
@@ -492,17 +644,23 @@ async function toggleReaction(m, emoji, add) {
   try {
     const update = await api(add ? 'POST' : 'DELETE', `/api/messages/${m.id}/reactions`, { emoji });
     updateReactions(update);
+    // Redrawing the message replaced the button that had focus: move focus
+    // to the reaction, so keyboard users keep their place.
+    if (document.activeElement === document.body) {
+      for (const view of Object.values(views)) {
+        const b = [...view.list.querySelectorAll(`li[data-id="${m.id}"] .reaction`)].find((x) => x.dataset.emoji === emoji)
+          || view.list.querySelector(`li[data-id="${m.id}"] .reaction.add`);
+        if (b) { b.focus(); break; }
+      }
+    }
   } catch (err) {
-    alert(err.message);
+    YapUI.toast.danger({ title: add ? "Couldn't add the reaction." : "Couldn't remove the reaction.", description: sentence(err.message) });
   }
 }
 
-function actionButton(label, onClick) {
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.className = 'link';
-  b.textContent = label;
-  b.addEventListener('click', onClick);
+function actionButton(label, onClick, size = 'sm') {
+  const b = h('button', { type: 'button', class: YapUI.Button.classes({ variant: 'ghost', size }), 'data-slot': 'button', text: label });
+  if (onClick) b.addEventListener('click', onClick);
   return b;
 }
 
@@ -540,7 +698,9 @@ function startEdit(li, m, view) {
   });
   const hint = document.createElement('p');
   hint.className = 'edit-hint muted';
-  hint.append('Escape to ', actionButton('cancel', cancel), ' · Enter to save');
+  const cancelBtn = h('button', { type: 'button', class: 'link edit-cancel', 'data-slot': 'link', text: 'cancel' });
+  cancelBtn.addEventListener('click', cancel);
+  hint.append('Escape to ', cancelBtn, ' · Enter to save');
   form.append(hint);
   text.replaceWith(form);
   actions.hidden = true;
@@ -548,13 +708,19 @@ function startEdit(li, m, view) {
 }
 
 async function deleteMessage(m) {
-  const what = !m.parent_id && m.reply_count ? 'Delete this message and its replies?' : 'Delete this message?';
-  if (!confirm(what + ' This can\'t be undone.')) return;
+  const ok = await YapUI.AlertDialog.confirm({
+    title: !m.parent_id && m.reply_count ? 'Delete this message and its replies?' : 'Delete this message?',
+    description: 'This can\'t be undone.',
+    status: 'danger',
+    confirmLabel: 'Delete',
+  });
+  if (!ok) return;
   try {
     await api('DELETE', `/api/messages/${m.id}`, {});
     messageDeleted(m);
+    YapUI.toast.success('Message deleted.');
   } catch (err) {
-    alert(err.message);
+    YapUI.toast.danger({ title: 'Message not deleted.', description: sentence(err.message) });
   }
 }
 
@@ -638,7 +804,9 @@ function closeThread() {
   $('app').classList.remove('thread-open');
 }
 
-$('thread-close').addEventListener('click', closeThread);
+$('thread-close').innerHTML = YapUI.icons.close; // static markup
+YapUI.Tooltip($('thread-close'), { content: 'Close thread' });
+$('thread-close').addEventListener('click', () => { closeThread(); composers.main.focus(); });
 // Escape in the thread panel closes it. Escape in an edit or the emoji
 // picker is handled there first.
 $('thread').addEventListener('keydown', (e) => {
@@ -657,19 +825,36 @@ const pickerEmoji = [
   '✨', '⭐', '☕', '🍕', '👎', '❌', '⚠️', '➕',
 ];
 
-let pickerCallback = null;
+// attachPicker makes trigger open the reaction picker, a YapUI.Popover. The
+// popover is made on the first click, since most buttons are never pressed.
+let openPicker = null;
 
-(() => {
-  const grid = $('emoji-picker').querySelector('.emoji-grid');
+function attachPicker(trigger, onPick) {
+  trigger.setAttribute('aria-haspopup', 'dialog');
+  trigger.setAttribute('aria-expanded', 'false');
+  trigger.addEventListener('click', () => {
+    if (trigger.yuiPicker) return; // the popover handles later clicks itself
+    const pop = YapUI.Popover(trigger, {
+      'aria-label': 'Add reaction',
+      placement: 'top end',
+      class: 'emoji-popover',
+      children: pickerContent((emoji) => { pop.close(); onPick(emoji); }),
+      onOpenChange: (open) => {
+        if (open) openPicker = pop;
+        else if (openPicker === pop) openPicker = null;
+      },
+    });
+    trigger.yuiPicker = pop;
+    pop.open();
+  });
+}
+
+function pickerContent(pick) {
+  const grid = h('div', { class: 'emoji-grid' });
   for (const e of pickerEmoji) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = e;
-    b.setAttribute('aria-label', e);
-    b.addEventListener('click', () => pick(e));
-    grid.append(b);
+    grid.append(h('button', { type: 'button', class: 'emoji', 'aria-label': e, text: e, on: { click: () => pick(e) } }));
   }
-  const any = $('emoji-picker').querySelector('.emoji-any');
+  const any = YapUI.Input({ variant: 'secondary', fullWidth: true, placeholder: 'Or type any emoji', maxLength: 16, aria: { label: 'Any emoji' }, class: 'emoji-any' });
   any.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.isComposing) {
       e.preventDefault();
@@ -677,39 +862,12 @@ let pickerCallback = null;
       if (v) pick(v);
     }
   });
-})();
-
-function openPicker(anchor, onPick) {
-  const p = $('emoji-picker');
-  pickerCallback = onPick;
-  p.hidden = false;
-  p.querySelector('.emoji-any').value = '';
-  const r = anchor.getBoundingClientRect();
-  const w = p.offsetWidth, h = p.offsetHeight;
-  p.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w)) + 'px';
-  p.style.top = (r.top - h - 6 > 8 ? r.top - h - 6 : Math.min(window.innerHeight - h - 8, r.bottom + 6)) + 'px';
-  p.querySelector('.emoji-grid button').focus();
+  return [grid, any];
 }
 
 function closePicker() {
-  $('emoji-picker').hidden = true;
-  pickerCallback = null;
+  if (openPicker) openPicker.close();
 }
-
-function pick(emoji) {
-  const cb = pickerCallback;
-  closePicker();
-  if (cb) cb(emoji);
-}
-
-document.addEventListener('mousedown', (e) => {
-  if (!$('emoji-picker').hidden && !$('emoji-picker').contains(e.target)) closePicker();
-}, true);
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !$('emoji-picker').hidden) { e.stopPropagation(); closePicker(); }
-}, true);
-window.addEventListener('resize', closePicker);
-for (const view of Object.values(views)) view.list.addEventListener('scroll', closePicker);
 
 // ---- message boxes ----
 
@@ -736,6 +894,15 @@ const composers = {
   }),
 };
 
+// Toasts sit in the bottom corner; keep them clear of the message box. On
+// phones they're at the top (the library's narrow placement), 16px down.
+const narrowScreen = window.matchMedia('(max-width: 639px)');
+function placeToasts() {
+  const box = $('composer');
+  YapUI.toast.configure({ offset: narrowScreen.matches || box.hidden ? 16 : box.offsetHeight + 8 });
+}
+window.addEventListener('resize', placeToasts);
+
 // ---- live updates ----
 
 function connect() {
@@ -743,7 +910,7 @@ function connect() {
   const ws = new WebSocket(`${proto}//${location.host}/api/ws`);
   state.ws = ws;
   ws.onopen = () => {
-    $('conn').classList.add('live');
+    setConn(true);
     // Catch up on anything missed while disconnected.
     if (state.wsRetry > 0) refresh();
     window.yapCalls?.start();
@@ -768,7 +935,7 @@ function connect() {
     }
   };
   ws.onclose = () => {
-    $('conn').classList.remove('live');
+    setConn(false);
     if (!state.me) return;
     const delay = Math.min(30000, 1000 * 2 ** state.wsRetry++);
     setTimeout(async () => {
@@ -777,6 +944,18 @@ function connect() {
       connect();
     }, delay);
   };
+}
+
+// The live-updates dot in the channel header: a Badge with spoken text.
+const conn = YapUI.Badge({ label: 'Connecting to live updates', color: 'default', size: 'sm', id: 'conn', class: 'conn' });
+$('conn').replaceWith(conn);
+const connTip = YapUI.Tooltip(conn, { content: 'Connecting…' });
+function setConn(live) {
+  conn.classList.toggle('live', live);
+  conn.classList.toggle('badge--success', live);
+  conn.classList.toggle('badge--default', !live);
+  conn.yui.setContent(null, live ? 'Live updates on' : 'Live updates off, reconnecting');
+  connTip.setContent(live ? 'Live updates on' : 'Reconnecting…');
 }
 
 // refresh reloads what's on screen.

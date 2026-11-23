@@ -1,7 +1,5 @@
 /* Voice and video calls (calls.js). */
 .call-buttons { display: flex; gap: 6px; }
-.call-buttons button { padding: 5px 12px; font-size: 13px; }
-.chat-head .call-buttons + #leave { margin-left: 6px; }
 
 .call-banner {
   display: flex;
@@ -9,21 +7,20 @@
   gap: 12px;
   flex-wrap: wrap;
   padding: 10px 20px;
-  background: color-mix(in srgb, var(--ok) 14%, var(--bg));
+  background: var(--success-soft, color-mix(in oklab, var(--success) 14%, var(--surface)));
   border-bottom: 1px solid var(--border);
 }
 .call-banner span { flex: 1; min-width: 12em; }
-.call-banner button { padding: 5px 12px; font-size: 13px; }
-.call-banner button.link { padding: 0; }
 
-.channels button.has-call::after { content: " 🔊"; font-size: 12px; }
+/* Channels with a call going; calls.js adds hidden text that says so. */
+.channel.has-call::after { content: "🔊" / ""; font-size: 12px; }
 
 .call-stage {
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 12px 20px;
-  background: var(--panel);
+  background: var(--surface-secondary);
   border-bottom: 1px solid var(--border);
   max-height: 60%;
   min-height: 0;
@@ -48,7 +45,7 @@
   outline-offset: -3px;
   transition: outline-color .15s;
 }
-.call-tile.speaking { outline-color: var(--ok); }
+.call-tile.speaking { outline-color: var(--success); }
 .call-tile video { width: 100%; height: 100%; object-fit: cover; display: none; }
 .call-tile.screen video { object-fit: contain; }
 .call-tile.mirror video { transform: scaleX(-1); }
@@ -79,12 +76,10 @@
   text-overflow: ellipsis;
 }
 .call-controls { display: flex; gap: 8px; flex-wrap: wrap; }
-.call-controls button { padding: 6px 12px; font-size: 13px; background: var(--hover); color: var(--text); }
-.call-controls button.off { background: var(--error); color: var(--accent-text); }
-.call-controls button.danger { background: var(--error); color: var(--accent-text); margin-left: auto; }
+.call-controls .call-leave { margin-left: auto; }
 
 @media (max-width: 640px) {
   .call-stage, .call-banner { padding-left: 16px; padding-right: 16px; }
   .call-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .call-controls button.danger { margin-left: 0; }
+  .call-controls .call-leave { margin-left: 0; }
 }
