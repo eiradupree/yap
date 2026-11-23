@@ -22,8 +22,8 @@ type configuration struct {
 	// so admins can rotate it from the System Console.
 	WebhookSecret string
 
-	// NameSiteYap sets the server's Site Name to "Yap" while it's still the default
-	// (see branding.go). On by default.
+	// NameSiteYap sets the server's Site Name and custom brand text to Yap's while
+	// they're still the defaults (see branding.go). On by default.
 	NameSiteYap bool
 }
 
@@ -87,7 +87,7 @@ func (p *Plugin) OnConfigurationChange() error {
 	p.setConfiguration(configuration)
 
 	// Runs on activation too: the server calls this hook before OnActivate.
-	p.applySiteName()
+	p.applyBranding()
 
 	return nil
 }

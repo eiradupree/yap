@@ -5,7 +5,7 @@
 // sign-in, the global header, the browser tab's icon and the avatar on system
 // messages. The host loads plugins before anyone signs in, so this covers the login
 // page too. It has no setting for these logos, so this targets the host's own
-// markup; see branding.css. The server's NameSiteYap setting names the site Yap.
+// markup; see branding.css. The server's NameSiteYap setting names the site Yap and sets its brand text.
 
 import yapMark from '../../../assets/yap-icon.svg?raw';
 

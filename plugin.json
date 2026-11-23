@@ -34,9 +34,9 @@
             },
             {
                 "key": "NameSiteYap",
-                "display_name": "Name the site Yap:",
+                "display_name": "Brand the site as Yap:",
                 "type": "bool",
-                "help_text": "While the Site Name is still Mattermost's default, sets it to Yap, so the browser tab and sign-in page say Yap. A Site Name you chose is never changed. Turn this off to name the site something else in Site Configuration > Customization.",
+                "help_text": "While the Site Name is still Mattermost's default, sets it to Yap, so the browser tab and sign-in page say Yap. While there's no custom brand text, turns custom branding on with Yap's, so the sign-up and landing pages don't name Mattermost. A name or text you chose is never changed. Turn this off to set them yourself in Site Configuration > Customization.",
                 "default": true
             }
         ]
