@@ -29,6 +29,7 @@ const icons = {
   file: svg('<path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5"/>'),
   camera: svg('<path d="M4 8h3l2-2.5h6L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/>'),
   alert: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/>'),
+  more: svg('<circle cx="5.5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="18.5" cy="12" r="1.3" fill="currentColor"/>'),
 };
 
 // iconButton makes an icon-only HeroUI button with a YapUI.Tooltip that
@@ -419,14 +420,22 @@ function createEditor({ placeholder, onSubmit, onCancel, onFiles, onChange }) {
   toolbar.setAttribute('role', 'toolbar');
   toolbar.setAttribute('aria-label', 'Formatting');
   const buttons = new Map();
+  // The buttons in groups, split at the separators; see fitToolbar.
+  const groups = [{ sep: null, ids: [] }];
+  const separator = () => {
+    const sep = document.createElement('span');
+    sep.className = 'sep';
+    sep.setAttribute('role', 'separator');
+    return sep;
+  };
   for (const c of formatCommands) {
     if (c.group) {
-      const sep = document.createElement('span');
-      sep.className = 'sep';
-      sep.setAttribute('role', 'separator');
+      const sep = separator();
+      groups.push({ sep, ids: [] });
       toolbar.append(sep);
       continue;
     }
+    groups[groups.length - 1].ids.push(c.id);
     // Disabled formats stay focusable and their tooltip says why.
     const b = iconButton(c.icon, c.label, 'fmt', { variant: 'toggle', showWhenDisabled: true });
     b.setTip(tipWithKeys(c.label, shortcutKeys(c)));
@@ -443,9 +452,77 @@ function createEditor({ placeholder, onSubmit, onCancel, onFiles, onChange }) {
     buttons.set(c.id, b);
     toolbar.append(b);
   }
+  // Formats that don't fit on one row (a narrow thread panel, a phone) move,
+  // a whole group at a time from the end, into a "More formatting" menu
+  // instead of wrapping onto a second row.
+  const moreSep = separator();
+  const moreBtn = iconButton('more', 'More formatting', 'fmt-more');
+  moreSep.hidden = moreBtn.hidden = true;
+  moreBtn.tabIndex = -1;
+  moreBtn.addEventListener('mousedown', (e) => e.preventDefault());
+  toolbar.append(moreSep, moreBtn);
+  let overflow = []; // the commands in the menu
+  let menuRange = null; // the selection to format, kept while the menu has focus
+  const moreMenu = YapUI.Dropdown(moreBtn, {
+    label: 'More formatting',
+    placement: 'bottom end',
+    selectionMode: 'multiple',
+    shouldCloseOnSelect: true,
+    items: () => overflow.map((c) => {
+      const b = buttons.get(c.id);
+      return {
+        key: c.id, label: c.label, icon: icons[c.icon],
+        shortcut: ['mod', ...(c.shift ? ['shift'] : []), c.key.toUpperCase()],
+        isDisabled: b.getAttribute('aria-disabled') === 'true',
+      };
+    }),
+    onOpenChange: (open) => {
+      if (!open) return;
+      const s = sel();
+      menuRange = s.rangeCount && el.contains(s.anchorNode) ? s.getRangeAt(0).cloneRange() : null;
+      moreMenu.setSelectedKeys(overflow.filter((c) => buttons.get(c.id).getAttribute('aria-pressed') === 'true').map((c) => c.id));
+    },
+    onAction: (id) => {
+      el.focus({ preventScroll: true });
+      if (menuRange) { sel().removeAllRanges(); sel().addRange(menuRange); }
+      menuRange = null;
+      if (!el.contains(sel().anchorNode)) placeCaretAtEnd();
+      run(id);
+    },
+  });
+
+  function fitToolbar() {
+    if (toolbar.hidden || !toolbar.isConnected || !toolbar.clientWidth) return;
+    const show = (g, on) => {
+      if (g.sep) g.sep.hidden = !on;
+      for (const id of g.ids) buttons.get(id).hidden = !on;
+    };
+    for (const g of groups) show(g, true);
+    moreSep.hidden = moreBtn.hidden = true;
+    let shown = groups.length;
+    if (toolbar.scrollWidth > toolbar.clientWidth) {
+      moreSep.hidden = moreBtn.hidden = false;
+      while (shown > 1 && toolbar.scrollWidth > toolbar.clientWidth) show(groups[--shown], false);
+      // The hidden group's separator divides the buttons from "More".
+      moreSep.hidden = true;
+      if (groups[shown].sep) groups[shown].sep.hidden = false;
+    }
+    overflow = formatCommands.filter((c) => !c.group && groups.slice(shown).some((g) => g.ids.includes(c.id)));
+    // Keep the toolbar's one tab stop on a button that's still there.
+    const list = toolbarButtons();
+    if (!list.some((b) => b.tabIndex === 0)) {
+      for (const b of [...buttons.values(), moreBtn]) b.tabIndex = -1;
+      list[0].tabIndex = 0;
+    }
+  }
+  new ResizeObserver(fitToolbar).observe(toolbar);
+  function toolbarButtons() {
+    return [...buttons.values(), moreBtn].filter((b) => !b.hidden);
+  }
+
   // One tab stop for the toolbar; arrow keys move within it.
   toolbar.addEventListener('keydown', (e) => {
-    const list = [...buttons.values()];
+    const list = toolbarButtons();
     const i = list.indexOf(document.activeElement);
     if (i < 0) return;
     let n = null;
