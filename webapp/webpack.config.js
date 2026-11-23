@@ -39,10 +39,6 @@ const config = {
             'node_modules',
         ],
         extensions: ['.js', '.jsx', '.ts', '.tsx'],
-        alias: {
-            'react/jsx-runtime$': path.resolve(__dirname, 'src/jsx_runtime.ts'),
-            'react/jsx-dev-runtime$': path.resolve(__dirname, 'src/jsx_runtime.ts'),
-        },
     },
     module: {
         rules: [
@@ -59,13 +55,29 @@ const config = {
                 },
             },
             {
-                // Compass UI ships ES modules that import bare specifiers like 'react/jsx-runtime'.
+                // Compass UI and HeroUI ship ES modules that import bare specifiers like 'react/jsx-runtime'.
                 test: /\.m?js$/,
-                include: /node_modules[\\/]@mattermost[\\/]compass-ui/,
+                include: /node_modules[\\/](@mattermost[\\/]compass-ui|@heroui)/,
                 resolve: {fullySpecified: false},
             },
             {
+                // HeroUI's stylesheet: Tailwind compiles it, then postcss.scope.js confines it to
+                // .yap-ui so it can't restyle the host. See src/heroui/README.md.
+                test: /heroui[\\/]heroui\.css$/,
+                use: ['style-loader', {loader: 'css-loader', options: {importLoaders: 1}}, 'postcss-loader'],
+            },
+            {
+                // Yap's logo (assets/yap-icon.svg): `?raw` imports its markup as a string
+                // (branding.ts builds the favicons from it); CSS url()s inline it.
+                test: /\.svg$/,
+                oneOf: [
+                    {resourceQuery: /raw/, type: 'asset/source'},
+                    {type: 'asset/inline'},
+                ],
+            },
+            {
                 test: /\.css$/,
+                exclude: /heroui[\\/]heroui\.css$/,
                 use: ['style-loader', 'css-loader'],
             },
         ],
@@ -76,7 +88,10 @@ const config = {
     externals: [
         {
             react: 'React',
+            'react/jsx-runtime': 'ReactJSXRuntime',
+            'react/jsx-dev-runtime': 'ReactJSXDevRuntime',
             'react-dom': 'ReactDOM',
+            'react-dom/client': 'ReactDOM',
             'react-intl': 'ReactIntl',
             redux: 'Redux',
             'react-redux': 'ReactRedux',

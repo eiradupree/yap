@@ -1,0 +1,90 @@
+/*
+ * Yap's logo in place of Mattermost's, before and after sign-in. These rules
+ * target the host's markup (Mattermost 12.x), so they only apply while the
+ * plugin is enabled (.yap-branded on <html>, set by branding.ts). If the host
+ * renames these classes, its own logo shows again; nothing breaks.
+ */
+
+/* Header of the pages before sign-in (log in, sign up, password reset). On an
+   unlicensed server it has a link with the Mattermost logo and "TEAM EDITION",
+   then, once Site Name isn't "Mattermost", a second link with the Site Name.
+   Hide the first when the second is there, and give the name Yap's logo. */
+.yap-branded .hfroute-header .header-logo-link:has(> .freeBadge):not(:only-child) {
+    display: none;
+}
+
+.yap-branded .hfroute-header .header-logo-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.yap-branded .hfroute-header .header-logo-link:not(:has(> .freeBadge))::before,
+.yap-branded .hfroute-header .header-logo-link:has(> .freeBadge):only-child::before {
+    width: 32px;
+    height: 32px;
+    flex: none;
+    background: url('../../../assets/yap-icon.svg') center / contain no-repeat;
+    content: '';
+}
+
+/* Only the logo link (Site Name still "Mattermost"): show the mark and "Yap" in
+   place of the Mattermost logo and badge. */
+.yap-branded .hfroute-header .header-logo-link:has(> .freeBadge):only-child > * {
+    display: none;
+}
+
+.yap-branded .hfroute-header .header-logo-link:has(> .freeBadge):only-child::after {
+    color: var(--center-channel-color);
+    content: 'Yap';
+    font-family: var(--font-family-heading);
+    font-size: var(--font-size-400);
+    font-weight: var(--font-weight-bold);
+}
+
+/* "Where would you like to view this?", shown before opening a link. */
+.yap-branded .get-app__logo {
+    width: auto;
+    height: 40px;
+    content: url('../../../assets/yap-icon.svg');
+}
+
+/* Global header, top left: the Mattermost wordmark and "TEAM EDITION" badge.
+   Licensed editions show the product name there instead, which is left alone. */
+.yap-branded .globalHeader-leftControls-productBranding-freeEdition {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.yap-branded .globalHeader-leftControls-productBranding-freeEdition-logo,
+.yap-branded .globalHeader-leftControls-productBranding-freeEdition-badge {
+    display: none;
+}
+
+.yap-branded .globalHeader-leftControls-productBranding-freeEdition::before {
+    width: 24px;
+    height: 24px;
+    flex: none;
+    background: url('../../../assets/yap-icon.svg') center / contain no-repeat;
+    content: '';
+}
+
+.yap-branded .globalHeader-leftControls-productBranding-freeEdition::after {
+    color: var(--sidebar-header-text-color);
+    content: 'Yap';
+    font-family: var(--font-family-heading);
+    font-size: var(--font-size-300);
+    font-weight: var(--font-weight-bold);
+    line-height: var(--line-height-300);
+}
+
+/* The avatar on system messages ("You joined the team"). The svg itself shows the
+   logo as its background, so no :has() is needed. */
+.yap-branded .post__img svg[aria-label='Mattermost Logo'] {
+    background: url('../../../assets/yap-icon.svg') center / contain no-repeat;
+}
+
+.yap-branded .post__img svg[aria-label='Mattermost Logo'] > * {
+    display: none;
+}

@@ -1,0 +1,29 @@
+/*
+ * HeroUI's styles for the components the plugin uses. Tailwind compiles this
+ * (postcss.config.js), then postcss.scope.js confines it to .yap-ui so it can't
+ * restyle the host. Add a component's @import in the same group and order as
+ * node_modules/@heroui/styles/dist/components/index.css.
+ */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@source "../../node_modules/@heroui/react/dist";
+
+@import "@heroui/styles/base/base.css" layer(base);
+
+@import "@heroui/styles/components/description.css" layer(components);
+@import "@heroui/styles/components/field-error.css" layer(components);
+@import "@heroui/styles/components/label.css" layer(components);
+@import "@heroui/styles/components/button.css" layer(components);
+@import "@heroui/styles/components/list-box-item.css" layer(components);
+@import "@heroui/styles/components/list-box.css" layer(components);
+@import "@heroui/styles/components/chip.css" layer(components);
+@import "@heroui/styles/components/alert.css" layer(components);
+@import "@heroui/styles/components/spinner.css" layer(components);
+@import "@heroui/styles/components/popover.css" layer(components);
+@import "@heroui/styles/components/select.css" layer(components);
+
+@import "@heroui/styles/themes/default" layer(theme);
+@import "@heroui/styles/utilities";
+@import "@heroui/styles/variants";

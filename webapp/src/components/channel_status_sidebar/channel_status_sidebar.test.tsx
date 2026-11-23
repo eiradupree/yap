@@ -28,7 +28,7 @@ test('lets members with permission change the status', async () => {
     expect(await (await currentStatus()).findByText('At risk')).toBeVisible();
     expect(mockFetchChannelStatus).toHaveBeenCalledWith('channel-id');
 
-    await userEvent.click(screen.getByRole('combobox', {name: 'New status'}));
+    await userEvent.click(screen.getByRole('button', {name: /New status/}));
     await userEvent.click(screen.getByRole('option', {name: 'Off track'}));
     await userEvent.click(screen.getByRole('button', {name: 'Save'}));
 
@@ -146,7 +146,7 @@ test('announces save errors', async () => {
     mockSetChannelStatus.mockRejectedValueOnce(new Error('Failed to update the channel status'));
     renderWithStore(<ChannelStatusSidebar/>);
 
-    await userEvent.click(await screen.findByRole('combobox', {name: 'New status'}));
+    await userEvent.click(await screen.findByRole('button', {name: /New status/}));
     await userEvent.click(screen.getByRole('option', {name: 'On track'}));
     await userEvent.click(screen.getByRole('button', {name: 'Save'}));
 
@@ -162,7 +162,7 @@ test('ignores a save that fails after switching channels', async () => {
     mockFetchChannelStatus.mockResolvedValueOnce('at-risk');
     const store = renderWithStore(<ChannelStatusSidebar/>);
 
-    await userEvent.click(await screen.findByRole('combobox', {name: 'New status'}));
+    await userEvent.click(await screen.findByRole('button', {name: /New status/}));
     await userEvent.click(screen.getByRole('option', {name: 'On track'}));
     await userEvent.click(screen.getByRole('button', {name: 'Save'}));
 
@@ -175,4 +175,28 @@ test('ignores a save that fails after switching channels', async () => {
 
     expect(screen.queryByText('Failed to update the channel status')).not.toBeInTheDocument();
     expect((await currentStatus()).getByText('At risk')).toBeVisible();
+});
+
+test('picks a status with the keyboard', async () => {
+    mockFetchChannelStatus.mockResolvedValue('');
+    mockSetChannelStatus.mockResolvedValue();
+    renderWithStore(<ChannelStatusSidebar/>);
+
+    const trigger = await screen.findByRole('button', {name: /New status/});
+    expect(trigger).toHaveAttribute('aria-haspopup', 'listbox');
+    act(() => trigger.focus());
+    await userEvent.keyboard('{ArrowDown}');
+
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getAllByRole('option').map((o) => o.textContent)).toEqual(['On track', 'At risk', 'Off track']);
+
+    // The menu renders in the plugin's scoped portal, so HeroUI's styles reach it.
+    expect(listbox.closest('.yap-ui')).not.toBeNull();
+
+    await userEvent.keyboard('{ArrowDown}{Enter}');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(trigger).toHaveTextContent('At risk');
+
+    await userEvent.click(screen.getByRole('button', {name: 'Save'}));
+    expect(mockSetChannelStatus).toHaveBeenCalledWith('channel-id', 'at-risk');
 });

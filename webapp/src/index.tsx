@@ -5,6 +5,7 @@
 // copy. Never import '@mattermost/compass-ui/styles/standalone' here: it overrides the user's theme.
 import '@mattermost/compass-ui/styles';
 
+import {installBranding} from 'branding/branding';
 import {reducer, statusesReset, statusReceived} from 'channel_status/state';
 import {setSiteURL} from 'client';
 import manifest from 'manifest';
@@ -27,8 +28,11 @@ import en from '../i18n/en.json';
 const translations: Record<string, Record<string, string>> = {en};
 
 export default class Plugin {
+    private removeBranding?: () => void;
+
     public async initialize(registry: PluginRegistry, store: Store<GlobalState>) {
         // @see https://developers.mattermost.com/extend/plugins/webapp/reference/
+        this.removeBranding = installBranding();
         setSiteURL(getConfig(store.getState()).SiteURL);
 
         // Strings fall back to their defaultMessage for locales without a file.
@@ -66,6 +70,11 @@ export default class Plugin {
                 onOpen={() => store.dispatch(showRHSPlugin)}
             />
         ));
+    }
+
+    // Called when the plugin is disabled; puts the host's logo and favicon back.
+    public uninitialize() {
+        this.removeBranding?.();
     }
 }
 

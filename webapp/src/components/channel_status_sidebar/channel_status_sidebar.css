@@ -9,9 +9,14 @@
 
 .StarterTemplate-ChannelStatusSidebar__text {
     margin: 0;
-    color: rgba(var(--center-channel-color-rgb), 0.72);
+    color: rgba(var(--center-channel-color-rgb), 0.75);
     font-size: var(--font-size-100);
     line-height: var(--line-height-100);
+}
+
+.StarterTemplate-ChannelStatusSidebar__command {
+    /* Full-strength text: the muted color is too faint on the host's code background. */
+    color: var(--center-channel-color);
 }
 
 .StarterTemplate-ChannelStatusSidebar__current {
@@ -35,6 +40,17 @@
     gap: var(--spacing-m);
 }
 
+.StarterTemplate-ChannelStatusSidebar__loading {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.StarterTemplate-ChannelStatusSidebar__retry {
+    align-self: flex-start;
+    margin-top: var(--spacing-xs);
+}
+
 .StarterTemplate-ChannelStatusSidebar__actions {
     display: flex;
     gap: var(--spacing-xs);
@@ -42,9 +58,11 @@
 
 .StarterTemplate-ChannelStatusSidebar__dot {
     display: inline-block;
+    flex: none;
     width: 8px;
     height: 8px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-pill);
+    background: currentcolor;
 }
 
 .StarterTemplate-ChannelStatusSidebar__dot--on-track {
@@ -57,4 +75,9 @@
 
 .StarterTemplate-ChannelStatusSidebar__dot--off-track {
     background: var(--dnd-indicator);
+}
+
+/* In the select's trigger the dot sits right before the text, with no gap of its own. */
+.StarterTemplate-ChannelStatusSidebar [data-slot='select-value'] .StarterTemplate-ChannelStatusSidebar__dot {
+    margin-right: var(--spacing-xs);
 }

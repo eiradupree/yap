@@ -21,6 +21,10 @@ type configuration struct {
 	// WebhookSecret authenticates calls to the /webhook endpoint. It's a "generated" setting,
 	// so admins can rotate it from the System Console.
 	WebhookSecret string
+
+	// NameSiteYap sets the server's Site Name to "Yap" while it's still the default
+	// (see branding.go). On by default.
+	NameSiteYap bool
 }
 
 // Clone shallow copies the configuration. Your implementation may require a deep copy if
@@ -81,6 +85,9 @@ func (p *Plugin) OnConfigurationChange() error {
 	}
 
 	p.setConfiguration(configuration)
+
+	// Runs on activation too: the server calls this hook before OnActivate.
+	p.applySiteName()
 
 	return nil
 }
