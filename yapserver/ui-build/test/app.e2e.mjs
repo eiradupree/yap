@@ -293,6 +293,22 @@ try {
   await p.waitFor(`[...document.querySelectorAll('#thread-messages > li')].some(li => li.textContent.includes('A reply'))`, 'the reply');
   await p.waitFor(`document.querySelector('${firstMsg} .replies')?.textContent.startsWith('1 reply')`, 'reply count on the message');
   check(await text('#thread-messages .thread-sep') === '1 reply', 'the thread shows "1 reply"');
+
+  // The reply box's toolbar is narrower than the formats: the ones that don't
+  // fit go into "More formatting" instead of wrapping onto a second row.
+  const bar = await ev(`const bar = document.querySelector('#thread-composer .format-bar');
+    const tops = new Set([...bar.querySelectorAll('button')].filter(b => !b.hidden).map(b => Math.round(b.getBoundingClientRect().top)));
+    return { rows: tops.size, overflowing: bar.scrollWidth > bar.clientWidth, more: !bar.querySelector('.fmt-more').hidden }`);
+  check(bar.rows === 1 && !bar.overflowing && bar.more, 'the thread toolbar is one row with a "More formatting" button', bar);
+  await p.type('Quoted');
+  await p.click('#thread-composer .fmt-more');
+  await p.waitFor(`document.querySelector('[role=menu][aria-label="More formatting"]')`, 'the More formatting menu');
+  const moreItems = await ev(`return [...document.querySelectorAll('[role=menu][aria-label="More formatting"] [role=menuitemcheckbox]')].map(i => i.textContent.trim())`);
+  check(moreItems.some((t) => t.startsWith('Quote')) && moreItems.some((t) => t.startsWith('Code block')), 'the menu has the formats that didn\'t fit', moreItems);
+  await p.click(`[role=menu][aria-label="More formatting"] [data-key="quote"]`);
+  await p.waitFor(`document.querySelector('#thread-composer .editor blockquote')?.textContent.includes('Quoted')`, 'the quote applied from the menu');
+  check(await ev(`return document.activeElement.closest('#thread-composer .editor') !== null`), 'focus goes back to the reply box after a format from the menu');
+  await ev(`const ed = document.querySelector('#thread-composer .editor'); ed.focus(); document.execCommand('selectAll'); document.execCommand('delete'); if (ed.querySelector('blockquote')) document.execCommand('formatBlock', false, 'div')`);
   await p.mouseAway();
   await shot('thread-light');
   await p.theme('dark');
@@ -422,6 +438,17 @@ try {
   // ---- phone width ----
 
   await p.viewport(390, 844, true);
+  await settle();
+  // Toasts sit at the bottom on phones, clear of the message box, so they
+  // don't cover the channel list and Sign out at the top.
+  await ev(`YapUI.toast('Phone toast')`);
+  await p.waitFor(`document.querySelector('.toast-region .toast')`, 'the phone toast');
+  await settle();
+  const phoneToast = await ev(`const t = document.querySelector('.toast-region .toast').getBoundingClientRect();
+    const c = document.getElementById('composer'); const box = c.hidden ? null : c.getBoundingClientRect();
+    return { top: Math.round(t.top), bottom: Math.round(t.bottom), height: innerHeight, composerTop: box && Math.round(box.top) }`);
+  check(phoneToast.top > phoneToast.height / 2 && phoneToast.bottom <= (phoneToast.composerTop ?? phoneToast.height), 'on a phone, toasts are at the bottom, above the message box', phoneToast);
+  await ev(`YapUI.toast.clear()`);
   await settle();
   await shot('phone-light');
   await p.theme('dark');

@@ -243,13 +243,15 @@ body {
 .format-bar {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  /* One row: what doesn't fit goes into the "More formatting" menu (editor.js). */
+  overflow: hidden;
   gap: 2px;
   padding: 4px 6px;
   border-bottom: 1px solid var(--separator);
 }
+.format-bar > * { flex: none; }
 .format-bar .sep { width: 1px; height: 18px; background: var(--separator); margin: 0 4px; }
-.format-bar .toggle-button, .box-foot .toggle-button, .box-foot .button { color: var(--muted); }
+.format-bar .toggle-button, .format-bar .fmt-more, .box-foot .toggle-button, .box-foot .button { color: var(--muted); }
 .format-bar .toggle-button[data-selected="true"],
 .box-foot .toggle-button[data-selected="true"] { color: var(--accent-soft-foreground); }
 .box-foot .button--primary { color: var(--accent-foreground); }

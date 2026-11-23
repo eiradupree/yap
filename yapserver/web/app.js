@@ -894,12 +894,13 @@ const composers = {
   }),
 };
 
-// Toasts sit in the bottom corner; keep them clear of the message box. On
-// phones they're at the top (the library's narrow placement), 16px down.
-const narrowScreen = window.matchMedia('(max-width: 639px)');
+// Toasts sit at the bottom, in the corner on wide screens and centered on
+// phones (the top of a phone screen holds the channel list and Sign out),
+// clear of the message box.
+YapUI.toast.configure({ narrowPlacement: 'bottom' });
 function placeToasts() {
   const box = $('composer');
-  YapUI.toast.configure({ offset: narrowScreen.matches || box.hidden ? 16 : box.offsetHeight + 8 });
+  YapUI.toast.configure({ offset: box.hidden ? 16 : box.offsetHeight + 8 });
 }
 window.addEventListener('resize', placeToasts);
 
