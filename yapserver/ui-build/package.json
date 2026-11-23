@@ -1,0 +1,14 @@
+{
+  "private": true,
+  "description": "Builds web/vendor/heroui/heroui.css from HeroUI's styles. Not served; see README.md.",
+  "scripts": {
+    "build": "tailwindcss --input heroui.input.css --output ../web/vendor/heroui/heroui.css --minify",
+    "test": "node test/run.mjs"
+  },
+  "devDependencies": {
+    "@heroui/styles": "3.2.8",
+    "@tailwindcss/cli": "4.3.5",
+    "axe-core": "4.11.0",
+    "tailwindcss": "4.3.5"
+  }
+}

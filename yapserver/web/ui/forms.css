@@ -1,0 +1,131 @@
+/* forms components: styles HeroUI's stylesheet doesn't cover. */
+
+/* A group label sits closer to its description than to the options. */
+.checkbox-group > [data-slot="description"] {
+  margin-top: var(--spacing);
+}
+
+/* With a label, HeroUI's 24px switch-group gap reads as two groups; tighten it. */
+.switch-group > [data-slot="label"] + .switch-group__items { margin-top: calc(var(--spacing) * -3); }
+
+/* Field error: HeroUI's text, plus an icon so the error isn't color alone. */
+.yui-field-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing);
+}
+.yui-field-error[hidden] { display: none; }
+.yui-field-error__icon {
+  flex: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  margin-top: 0.0625rem;
+}
+/* HeroUI mutes errors under checkboxes and switches; keep them danger-red
+   like every other field error. */
+.checkbox > .yui-field-error,
+.switch > .yui-field-error {
+  color: var(--danger);
+}
+
+/* necessityIndicator: 'label' → "(required)" / "(optional)". */
+.yui-necessity {
+  font-weight: var(--font-weight-normal, 400);
+  color: var(--muted);
+}
+
+/* Read-only text fields: no fill, just an outline, so they don't look
+   editable (HeroUI has no read-only style). */
+.textfield[data-readonly="true"] .input,
+.textfield[data-readonly="true"] .textarea {
+  --input-bg: transparent;
+  --input-bg-hover: transparent;
+  --input-bg-focus: transparent;
+  --textarea-bg: transparent;
+  --textarea-bg-hover: transparent;
+  --textarea-bg-focus: transparent;
+  background-color: transparent;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.textfield[data-readonly="true"] .input:focus,
+.textfield[data-readonly="true"] .textarea:focus {
+  box-shadow: inset 0 0 0 1px var(--border), 0 0 0 2px var(--focus);
+}
+
+/* The group's error sits below the last option, not against it. */
+.checkbox-group > [data-slot="field-error"] {
+  margin-top: calc(var(--spacing) * 2);
+}
+
+/* Fieldset: the legend isn't a flex item, so HeroUI's gap doesn't reach it. */
+.fieldset {
+  min-inline-size: 0;
+}
+.fieldset > .fieldset__legend {
+  margin-bottom: calc(var(--spacing) * 4);
+}
+.fieldset > .fieldset__legend + .fieldset__description {
+  margin-top: calc(var(--spacing) * -3);
+}
+.fieldset__description {
+  font-size: var(--text-sm);
+}
+
+/* Form: summary at the top, fields, actions at the bottom left. */
+.yui-form {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing) * 4);
+}
+.yui-form__summary[hidden] { display: none; }
+.yui-form__summary-list {
+  list-style: disc;
+  padding-inline-start: 1.1em;
+}
+.yui-form__summary-list:empty { display: none; }
+.yui-form__summary-link {
+  color: inherit;
+  text-decoration: underline;
+}
+.yui-form__status {
+  font-size: var(--text-sm);
+  color: var(--success-soft-foreground, var(--foreground));
+}
+.yui-form__status:empty { display: none; }
+.yui-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: calc(var(--spacing) * 2);
+}
+
+/* HeroUI's required asterisk, with empty alt text so screen readers don't
+   read "star" as part of the label; aria-required already says it. Same
+   selectors as HeroUI's label.css. */
+.label--required::after,
+[data-required="true"]:not([role="group"]):not([role="radiogroup"]):not([role="checkboxgroup"]) > .label::after,
+[data-required="true"]:not([data-slot="radio"]):not([data-slot="checkbox"]) > .label::after {
+  content: "*" / "";
+}
+
+/* An unchecked box needs a visible edge (WCAG 1.4.11, 3:1). HeroUI's fields
+   are borderless with a faint shadow, which leaves a white box on Yap's
+   near-white background nearly invisible. Selected, indeterminate and
+   invalid states keep HeroUI's styling. */
+.checkbox:not([data-selected="true"]):not([data-indeterminate="true"]):not([data-invalid="true"]) .checkbox__control {
+  border-width: 1px;
+  border-color: color-mix(in oklab, var(--foreground) 45%, transparent);
+}
+.checkbox:not([data-selected="true"]):not([data-indeterminate="true"]):not([data-invalid="true"]):hover .checkbox__control {
+  border-color: color-mix(in oklab, var(--foreground) 60%, transparent);
+}
+
+/* An off switch's track is HeroUI's --default, which in light mode is 1.09:1
+   against the page, with a white thumb at 1.19:1 on it: the control all but
+   disappears (WCAG 1.4.11 asks 3:1). Darken the track toward the foreground:
+   3.5:1 against the page and 3.8:1 under the thumb. Dark mode already passes
+   (the thumb is 20:1 on the page). Hover and pressed derive from this token. */
+:root:not(.dark):not([data-theme="dark"]) .switch {
+  --switch-control-bg: color-mix(in oklab, var(--default), var(--foreground) 45%);
+}

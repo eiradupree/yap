@@ -1,0 +1,27 @@
+/* dialogs components: styles HeroUI's stylesheet doesn't cover. */
+
+/* React Aria sets --visual-viewport-height at runtime; dialogs.js does too
+   (from window.visualViewport). This is the fallback before it runs. */
+.modal__backdrop,
+.alert-dialog__backdrop {
+  --visual-viewport-height: 100dvh;
+}
+
+/* Body content after the description gets the same spacing HeroUI puts
+   between the header and the body. */
+.yui-dialog-description + * {
+  margin-top: 0.75rem;
+}
+
+/* cover and full fill the viewport: the container is w-fit from sm up in
+   HeroUI's CSS, which would shrink them to their content. */
+.yui-dialog-container--cover,
+.yui-dialog-container--full {
+  width: 100%;
+}
+
+/* Type-to-confirm field in an AlertDialog. */
+.yui-type-to-confirm .yui-confirm-text {
+  font-weight: 600;
+  font-family: var(--font-mono, ui-monospace, monospace);
+}

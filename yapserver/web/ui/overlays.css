@@ -1,0 +1,105 @@
+/* overlays components: styles HeroUI's stylesheet doesn't cover. */
+
+/* HeroUI leaves the text color to inheritance; set it, since the portal may
+   sit under page styles with another color. */
+.tooltip,
+.popover {
+  color: var(--overlay-foreground);
+}
+
+/* HeroUI's tooltip uses word-break: break-all, which splits ordinary words
+   mid-word ("disab-led"). Wrap at word boundaries and only break very long
+   tokens such as URLs. */
+.tooltip {
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Popovers hold 1–3 sentences; keep lines readable and inside small screens. */
+.popover {
+  max-width: min(20rem, calc(100vw - 16px));
+}
+
+/* Keyboard shortcut inside a tooltip ("Bold ⌘B"). */
+.yui-tooltip__kbd {
+  margin-inline-start: 6px;
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: inherit;
+}
+
+/* The arrow. React Aria's OverlayArrow places it with inline styles; ours
+   uses --yui-arrow-x / --yui-arrow-y set by overlays.js. HeroUI rotates the
+   <svg> inside per data-placement. */
+.yui-overlay-arrow {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  width: 12px;
+  height: 6px;
+}
+.yui-overlay-arrow svg {
+  display: block;
+  flex: none;
+  overflow: visible;
+}
+[data-placement="top"] > .yui-overlay-arrow {
+  top: calc(100% - 0.5px);
+  left: var(--yui-arrow-x, 50%);
+  translate: -50% 0;
+}
+[data-placement="bottom"] > .yui-overlay-arrow {
+  bottom: calc(100% - 0.5px);
+  left: var(--yui-arrow-x, 50%);
+  translate: -50% 0;
+}
+[data-placement="left"] > .yui-overlay-arrow,
+[data-placement="right"] > .yui-overlay-arrow {
+  width: 6px;
+  height: 12px;
+  top: var(--yui-arrow-y, 50%);
+  translate: 0 -50%;
+}
+[data-placement="left"] > .yui-overlay-arrow { left: calc(100% - 0.5px); }
+[data-placement="right"] > .yui-overlay-arrow { right: calc(100% - 0.5px); }
+
+/* Optional layout helpers for popover content: a heading row with a close
+   button, and a row of actions. */
+.yui-popover__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.yui-popover__body {
+  color: var(--muted);
+}
+.yui-popover__body + .yui-popover__body,
+.yui-popover__field + .yui-popover__field {
+  margin-top: 8px;
+}
+.yui-popover__field {
+  display: grid;
+  gap: 4px;
+}
+.yui-popover__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* A disabled control that explains itself with a tooltip (showWhenDisabled)
+   must still receive hover. HeroUI sets pointer-events: none on
+   [aria-disabled="true"] buttons; restore it, but keep the disabled look. */
+[data-yui-tooltip-disabled="true"][aria-disabled="true"] {
+  pointer-events: auto;
+}
+.button[data-yui-tooltip-disabled="true"][aria-disabled="true"]:hover,
+.button[data-yui-tooltip-disabled="true"][aria-disabled="true"]:active {
+  background-color: var(--button-bg);
+  transform: none;
+}

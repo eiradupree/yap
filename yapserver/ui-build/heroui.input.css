@@ -1,0 +1,89 @@
+/*
+ * HeroUI's stylesheet (node_modules/@heroui/styles/dist/index.css), cut down to
+ * the components Yap's UI library wraps. Keep the layer order and the import
+ * order of HeroUI's components/index.css: shared parts first.
+ *
+ * source(none): Yap's markup doesn't use Tailwind utility classes, so none are
+ * generated. Component styles are compiled from their own @apply rules.
+ */
+@layer theme, base, components, utilities;
+
+@import "tailwindcss" source(none);
+
+@import "@heroui/styles/base/base.css" layer(base);
+@import "@heroui/styles/base/overlay-motion.css" layer(base);
+
+/* Shared parts */
+@import "@heroui/styles/components/close-button.css" layer(components);
+@import "@heroui/styles/components/description.css" layer(components);
+@import "@heroui/styles/components/error-message.css" layer(components);
+@import "@heroui/styles/components/field-error.css" layer(components);
+@import "@heroui/styles/components/label.css" layer(components);
+
+/* Navigation */
+@import "@heroui/styles/components/link.css" layer(components);
+@import "@heroui/styles/components/tabs.css" layer(components);
+
+/* Buttons */
+@import "@heroui/styles/components/button.css" layer(components);
+@import "@heroui/styles/components/button-group.css" layer(components);
+@import "@heroui/styles/components/toggle-button.css" layer(components);
+@import "@heroui/styles/components/toggle-button-group.css" layer(components);
+
+/* Collections */
+@import "@heroui/styles/components/dropdown.css" layer(components);
+@import "@heroui/styles/components/menu-item.css" layer(components);
+@import "@heroui/styles/components/menu-section.css" layer(components);
+@import "@heroui/styles/components/menu.css" layer(components);
+
+/* Controls */
+@import "@heroui/styles/components/switch.css" layer(components);
+@import "@heroui/styles/components/switch-group.css" layer(components);
+
+/* Data display */
+@import "@heroui/styles/components/badge.css" layer(components);
+@import "@heroui/styles/components/chip.css" layer(components);
+
+/* Feedback */
+@import "@heroui/styles/components/alert.css" layer(components);
+@import "@heroui/styles/components/empty-state.css" layer(components);
+@import "@heroui/styles/components/skeleton.css" layer(components);
+@import "@heroui/styles/components/progress-bar.css" layer(components);
+@import "@heroui/styles/components/spinner.css" layer(components);
+@import "@heroui/styles/components/toast.css" layer(components);
+
+/* Forms */
+@import "@heroui/styles/components/checkbox-group.css" layer(components);
+@import "@heroui/styles/components/checkbox.css" layer(components);
+@import "@heroui/styles/components/fieldset.css" layer(components);
+@import "@heroui/styles/components/input.css" layer(components);
+@import "@heroui/styles/components/input-group.css" layer(components);
+@import "@heroui/styles/components/textfield.css" layer(components);
+@import "@heroui/styles/components/search-field.css" layer(components);
+@import "@heroui/styles/components/textarea.css" layer(components);
+
+/* Layout */
+@import "@heroui/styles/components/card.css" layer(components);
+@import "@heroui/styles/components/header.css" layer(components);
+@import "@heroui/styles/components/separator.css" layer(components);
+@import "@heroui/styles/components/surface.css" layer(components);
+
+/* Media */
+@import "@heroui/styles/components/avatar.css" layer(components);
+@import "@heroui/styles/components/avatar-group.css" layer(components);
+
+/* Overlays */
+@import "@heroui/styles/components/alert-dialog.css" layer(components);
+@import "@heroui/styles/components/modal.css" layer(components);
+@import "@heroui/styles/components/popover.css" layer(components);
+@import "@heroui/styles/components/tooltip.css" layer(components);
+
+/* Typography */
+@import "@heroui/styles/components/kbd.css" layer(components);
+
+/* Theme tokens */
+@import "@heroui/styles/themes/default" layer(theme);
+
+/* HeroUI's custom utilities and variants (no-highlight, data-* variants…) used by the @apply rules above. */
+@import "@heroui/styles/utilities";
+@import "@heroui/styles/variants";

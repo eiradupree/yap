@@ -1,0 +1,62 @@
+/*
+ * Yap's theme on top of HeroUI's default theme (vendor/heroui/heroui.css).
+ *
+ * Yap's brand color, plus three fixes where HeroUI's defaults miss WCAG AA
+ * (4.5:1 for normal text), measured in Chrome:
+ *   light --muted #71717a: 4.43 on --background, 4.07 on --default (Kbd,
+ *         chips)                                    → #62626b: 5.02 or more on
+ *                                                     every HeroUI surface
+ *   light --danger #ff383c: white on it 3.48,
+ *         as text on --background 3.27              → #c62828: 5.62 / 5.16
+ *   dark --danger #db3b3e: white on it 4.35         → #f87171 with dark text: 6.92,
+ *                                                     as text on --background 7.32
+ * (No red passes both with white text on it and as text on the dark
+ * background, so dark mode uses dark text on danger, as it does on accent.)
+ * HeroUI derives the hover, soft and focus colors from these with color-mix,
+ * so they follow automatically.
+ * Unlayered, so it wins over HeroUI's layered defaults. Selectors match
+ * HeroUI's theme blocks; YapUI.theme keeps class="dark" / data-theme on <html>.
+ */
+:root,
+[data-theme="light"] {
+  --accent: #5b4fd6;
+  --accent-foreground: #ffffff;
+  --muted: #62626b;
+  --danger: #c62828;
+}
+
+.dark,
+[data-theme="dark"] {
+  --accent: #8a80ff;
+  --accent-foreground: #0f0f12;
+  /* :root above also matches in dark mode, so restore HeroUI's dark muted
+     (7.72:1 on --background) over the light fix. */
+  --muted: oklch(70.5% 0.015 286.067);
+  --danger: #f87171;
+  --danger-foreground: #0f0f12;
+}
+
+/* Overlays render here, above the page. */
+.yui-portal {
+  position: relative;
+  z-index: 50;
+}
+
+/* Page scroll is locked while a modal is open (YapUI.isolate). */
+html[data-yui-scroll-locked="true"] {
+  overflow: hidden;
+  padding-right: var(--yui-scrollbar-gap, 0px);
+}
+
+/* Text only for screen readers. */
+.yui-visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
