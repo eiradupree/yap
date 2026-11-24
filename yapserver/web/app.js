@@ -22,6 +22,8 @@ const state = {
   current: null, // channel id
   thread: null, // id of the message whose thread is open
   unread: new Map(), // channel id -> unread message count
+  mutedUsers: new Map(), // user id -> username, people this person muted (mutes)
+  revealed: new Set(), // ids of muted people's messages shown with "Show"
   ws: null,
   wsRetry: 0,
 };
@@ -128,6 +130,8 @@ function signedOut() {
   closeThread();
   closePicker();
   state.unread.clear();
+  state.mutedUsers.clear();
+  state.revealed.clear();
   for (const m of [...openModals]) m.close();
   updateTitle();
   setAuthMode(false);
@@ -186,16 +190,36 @@ $('account').addEventListener('click', () => {
   });
   deleteForm.yui.submitButton.className = YapUI.Button.classes({ variant: 'danger' });
 
-  openModal({
+  // Muted people, with Unmute. The list redraws when mutes change.
+  const mutedList = h('ul', { id: 'muted-list', class: 'member-list muted-list', 'aria-labelledby': 'muted-heading' });
+  const renderMuted = () => {
+    const rows = [...state.mutedUsers].sort((a, b) => a[1].localeCompare(b[1])).map(([id, name]) => h('li', null,
+      YapUI.Avatar({ name, alt: '', size: 'sm', variant: 'soft', color: avatarColor(name) }),
+      h('span', { class: 'member-name', text: name }),
+      h('span', { class: 'member-end' }, YapUI.Button({
+        children: 'Unmute', variant: 'secondary', size: 'sm', ariaLabel: `Unmute ${name}`,
+        onPress: () => setUserMuted(id, name, false),
+      }))));
+    mutedList.replaceChildren(...(rows.length ? rows : [h('li', { class: 'muted muted-none', text: "You haven't muted anyone." })]));
+  };
+  renderMuted();
+  mutesListeners.add(renderMuted);
+
+  const dialog = openModal({
     title: 'Account',
     class: 'account-dialog',
     body: [
+      h('section', { class: 'account-section', 'aria-labelledby': 'muted-heading' },
+        h('h3', { id: 'muted-heading', text: 'Muted people' }),
+        h('p', { class: 'muted account-note', text: "Their messages are collapsed and never notify you. They aren't told, and only you can see this list." }),
+        mutedList),
       h('section', { class: 'account-section', 'aria-labelledby': 'password-heading' },
         h('h3', { id: 'password-heading', text: 'Change password' }), passwordForm),
       h('section', { class: 'account-section danger-zone', 'aria-labelledby': 'delete-heading' },
         h('h3', { id: 'delete-heading', text: 'Delete account' }), deleteForm),
     ],
   }, 'account-dialog');
+  dialog.closed.then(() => mutesListeners.delete(renderMuted));
 });
 
 // ---- admin ----
@@ -303,6 +327,11 @@ function renderChannels() {
     const b = h('button', { type: 'button', class: 'channel', data: { channelId: ch.id } }, '# ' + ch.name);
     if (ch.id === state.current) { b.classList.add('active'); b.setAttribute('aria-current', 'page'); }
     if (!ch.joined) b.classList.add('not-joined');
+    if (ch.muted) {
+      b.classList.add('channel--muted');
+      b.append(h('span', { class: 'channel-muted-icon', 'aria-hidden': 'true', html: bellOffIcon }),
+        h('span', { class: 'yui-visually-hidden', text: ', muted' }));
+    }
     const unread = state.unread.get(ch.id);
     if (unread) {
       b.classList.add('unread');
@@ -365,6 +394,7 @@ async function openChannel(id, { keepThread = false } = {}) {
   $('join-banner').hidden = joined;
   $('composer').hidden = !joined;
   $('leave').hidden = !joined || (ch && ch.name === 'general');
+  renderMuteChannel();
   placeToasts();
   window.yapCalls?.channelOpened();
   if (!joined) return;
@@ -408,6 +438,87 @@ $('leave').addEventListener('click', async () => {
   await loadChannels();
   const general = state.channels.find((c) => c.name === 'general');
   openChannel(general ? general.id : state.channels[0]?.id);
+});
+
+// ---- muting ----
+// Private: muting someone or a channel is only ever known to the person who
+// did it (see mutes.go). A muted person's messages show collapsed, with Show;
+// muted people and channels don't count as unread and don't notify.
+
+const bellOffIcon = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4.6A6 6 0 0 1 18 9v4l1.5 3H8M6 9v4l-1.5 3H13M10 20a2 2 0 0 0 4 0M3 3l18 18"/></svg>'; // static markup
+
+// Called whenever mutes change (here or on another device).
+const mutesListeners = new Set();
+
+async function loadMutedUsers() {
+  const users = await api('GET', '/api/me/muted-users');
+  state.mutedUsers = new Map(users.map((u) => [u.id, u.username]));
+}
+
+// mutesKey sums up the current mutes, to tell whether a reload changed any.
+function mutesKey() {
+  return [...state.mutedUsers.keys()].sort().join() + '|' + state.channels.filter((c) => c.muted).map((c) => c.id).join();
+}
+
+function isMutedMessage(m) {
+  const ch = state.channels.find((c) => c.id === m.channel_id);
+  return state.mutedUsers.has(m.user_id) || !!ch?.muted;
+}
+
+function mutesChanged() {
+  for (const view of Object.values(views)) if (view.items.length) redraw(view, false);
+  renderChannels();
+  renderMuteChannel();
+  updateTitle();
+  for (const f of mutesListeners) f();
+}
+
+async function setUserMuted(id, name, mute) {
+  try {
+    await api(mute ? 'PUT' : 'DELETE', `/api/me/muted-users/${id}`, {});
+  } catch (err) {
+    YapUI.toast.danger({ title: mute ? `Couldn't mute ${name}.` : `Couldn't unmute ${name}.`, description: sentence(err.message) });
+    return false;
+  }
+  if (mute) state.mutedUsers.set(id, name); else state.mutedUsers.delete(id);
+  for (const view of Object.values(views)) for (const m of view.items) if (m.user_id === id) state.revealed.delete(m.id);
+  mutesChanged();
+  YapUI.toast.success(mute
+    ? { title: `${name} muted.`, description: "Their messages are collapsed and won't notify you. They aren't told." }
+    : `${name} unmuted.`);
+  return true;
+}
+
+// The Mute/Unmute button in the channel header.
+const muteChannelTip = YapUI.Tooltip($('mute-channel'), { content: '' });
+function renderMuteChannel() {
+  const ch = currentChannel();
+  const b = $('mute-channel');
+  b.hidden = !ch || !ch.joined;
+  if (!ch) return;
+  b.textContent = ch.muted ? 'Unmute' : 'Mute';
+  b.setAttribute('aria-label', `${ch.muted ? 'Unmute' : 'Mute'} #${ch.name}`);
+  muteChannelTip.setContent(ch.muted
+    ? `Get notifications and unread counts for #${ch.name} again`
+    : `No notifications or unread counts from #${ch.name}. Only you can see this.`);
+}
+
+$('mute-channel').addEventListener('click', async () => {
+  const ch = currentChannel();
+  if (!ch) return;
+  const mute = !ch.muted;
+  try {
+    await api(mute ? 'PUT' : 'DELETE', `/api/me/muted-channels/${ch.id}`, {});
+  } catch (err) {
+    YapUI.toast.danger({ title: mute ? "Couldn't mute the channel." : "Couldn't unmute the channel.", description: sentence(err.message) });
+    return;
+  }
+  ch.muted = mute;
+  if (mute) state.unread.delete(ch.id);
+  mutesChanged();
+  YapUI.toast.success(mute
+    ? { title: `#${ch.name} muted.`, description: "It won't notify you or show unread counts." }
+    : `#${ch.name} unmuted.`);
 });
 
 // ---- messages ----
@@ -457,6 +568,11 @@ function renderMessages(view, msgs) {
 function redraw(view, toBottom) {
   const list = view.list;
   const offset = list.scrollHeight - list.scrollTop;
+  // Keep focus on the same message (and button, if it's still there) when a
+  // redraw replaces the one that had it, e.g. after muting its author.
+  const active = document.activeElement;
+  const focusLi = list.contains(active) ? active.closest('li[data-id]') : null;
+  const keep = focusLi && { id: focusLi.dataset.id, label: active.getAttribute('aria-label'), self: active === focusLi };
   list.replaceChildren();
   if (view.items.length === 0) {
     showEmpty(view, view.empty);
@@ -476,6 +592,11 @@ function redraw(view, toBottom) {
   view.group = group;
   list.scrollTop = toBottom ? list.scrollHeight : list.scrollHeight - offset;
   view.atBottom = toBottom || view.atBottom;
+  const li = keep && list.querySelector(`li[data-id="${keep.id}"]`);
+  if (li) {
+    const same = !keep.self && keep.label && [...li.querySelectorAll('[aria-label]')].find((el) => el.getAttribute('aria-label') === keep.label);
+    (same || li.querySelector('.collapsed-row .button') || li).focus({ preventScroll: true });
+  }
 }
 
 function repliesLabel(n) {
@@ -506,9 +627,35 @@ function rerender(view, m) {
   if (view.atBottom) view.list.scrollTop = view.list.scrollHeight;
 }
 
+// collapsedItem stands in for a message from someone the reader muted.
+function collapsedItem(m, view, group) {
+  const show = actionButton('Show', () => {
+    state.revealed.add(m.id);
+    rerender(view, m);
+    view.list.querySelector(`li[data-id="${m.id}"]`)?.focus();
+  });
+  show.setAttribute('aria-label', `Show message from ${m.username}`);
+  const li = h('li', { class: 'first collapsed', data: { id: m.id } },
+    h('div', { class: 'collapsed-row' },
+      h('span', { class: 'collapsed-icon', 'aria-hidden': 'true', html: bellOffIcon }),
+      h('span', { class: 'muted', text: `Message from ${m.username}, who you muted` }),
+      show));
+  if (view === views.main && m.reply_count) {
+    const b = actionButton(`${repliesLabel(m.reply_count)} · last ${formatTime(m.last_reply_at)}`, () => openThread(m.id));
+    b.classList.add('replies');
+    li.append(b);
+  }
+  // The next message gets its own name and avatar.
+  group.author = null;
+  group.time = 0;
+  return li;
+}
+
 function messageItem(m, view, group) {
+  if (state.mutedUsers.has(m.user_id) && !state.revealed.has(m.id)) return collapsedItem(m, view, group);
   const li = document.createElement('li');
   li.dataset.id = m.id;
+  li.tabIndex = -1; // so "Show" can move focus to the message
   // Group consecutive messages from one person within 5 minutes.
   if (m.user_id !== group.author || m.created_at - group.time > 5 * 60 * 1000) {
     li.classList.add('first');
@@ -561,6 +708,20 @@ function messageItem(m, view, group) {
   if (view === views.main) actions.append(actionButton('Reply', () => openThread(m.id)));
   const mine = m.user_id === state.me.id;
   if (mine && m.body) actions.append(actionButton('Edit', () => startEdit(li, m, view)));
+  if (!mine) {
+    const muted = state.mutedUsers.has(m.user_id);
+    const b = actionButton(muted ? 'Unmute' : 'Mute', async () => {
+      if (!await setUserMuted(m.user_id, m.username, !muted)) return;
+      // Move focus to where the message now is (collapsed after muting).
+      for (const v of Object.values(views)) {
+        const el = v.list.querySelector(`li[data-id="${m.id}"]`);
+        if (el) { (el.querySelector('.collapsed-row .button') || el).focus(); break; }
+      }
+    });
+    b.setAttribute('aria-label', `${muted ? 'Unmute' : 'Mute'} ${m.username}`);
+    YapUI.Tooltip(b, { content: muted ? `Unmute ${m.username}` : `Mute ${m.username}. Only you will know.` });
+    actions.append(b);
+  }
   if (mine || state.me.admin) actions.append(actionButton('Delete', () => deleteMessage(m)));
   li.append(actions);
 
@@ -767,11 +928,11 @@ function received(m) {
     bumpReplies(m.parent_id, 1, m.created_at);
     // Replies count as unread only for the person who started the thread.
     const watching = state.thread === m.parent_id && !document.hidden;
-    if (m.user_id !== state.me.id && m.parent_user_id === state.me.id && !watching) notify(m);
+    if (m.user_id !== state.me.id && m.parent_user_id === state.me.id && !watching && !isMutedMessage(m)) notify(m);
     return;
   }
   if (m.channel_id === state.current) appendMessage(views.main, m);
-  if (m.user_id !== state.me.id && (m.channel_id !== state.current || document.hidden)) {
+  if (m.user_id !== state.me.id && !isMutedMessage(m) && (m.channel_id !== state.current || document.hidden)) {
     state.unread.set(m.channel_id, (state.unread.get(m.channel_id) || 0) + 1);
     renderChannels();
     updateTitle();
@@ -933,6 +1094,11 @@ function connect() {
       window.yapCalls?.update(ev.call);
     } else if (ev.type === 'channel_created') {
       loadChannels();
+    } else if (ev.type === 'mutes_changed') {
+      // Muted or unmuted on another device. This device hears about its own
+      // changes too; it has already applied them, so only redraw on news.
+      const before = mutesKey();
+      Promise.all([loadMutedUsers(), loadChannels()]).then(() => { if (mutesKey() !== before) mutesChanged(); }).catch(() => {});
     }
   };
   ws.onclose = () => {
@@ -1022,7 +1188,7 @@ async function startApp() {
   $('me').textContent = 'Signed in as ' + state.me.username;
   $('members').hidden = !state.me.admin;
   renderNotifyButton();
-  await loadChannels();
+  await Promise.all([loadChannels(), loadMutedUsers().catch(() => {})]);
   let saved = null;
   try { saved = Number(localStorage.getItem('yap.channel')); } catch {}
   const pick = state.channels.find((c) => c.id === saved && c.joined)

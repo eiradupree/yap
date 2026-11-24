@@ -318,6 +318,72 @@ try {
   await settle();
   check(await ev(`return document.getElementById('thread').hidden`), 'Close thread hides the panel');
 
+  // ---- muting, privately ----
+
+  const generalCh = ch.find((c) => c.name === 'general');
+  const bobSays = (channelId, body) => fetch(origin + `/api/channels/${channelId}/messages`, { method: 'POST', headers: { cookie: bob, 'Content-Type': 'application/json' }, body: JSON.stringify({ body }) });
+  const bobMsgId = await ev(`return [...document.querySelectorAll('#messages > li')].find(li => li.textContent.includes('Hi alice')).dataset.id`);
+  const bobLi = `#messages > li[data-id="${bobMsgId}"]`;
+  check(!await ev(`return !!document.querySelector('${bobLi} .actions [aria-label="Mute alice"]') || !!document.querySelector('#messages > li .actions [aria-label="Mute alice"]')`), "your own messages have no Mute");
+  await p.hover(bobLi);
+  await p.click(`${bobLi} .actions [aria-label="Mute bob"]`);
+  await p.waitFor(`document.querySelector('${bobLi}')?.classList.contains('collapsed')`, "bob's message collapsing");
+  check(/Message from bob, who you muted/.test(await text(bobLi)) && !/welcome/.test(await text(bobLi)), "a muted person's message collapses to one line", await text(bobLi));
+  check(await focusedText() === 'Show message from bob', 'after muting, focus is on the collapsed message\'s Show', await focusedText());
+  await ev(`YapUI.toast.clear()`);
+  await p.mouseAway();
+  await shot('muted-person-light');
+  await p.theme('dark');
+  await shot('muted-person-dark');
+  await p.theme('light');
+
+  // Muted people don't count as unread (nor notify).
+  await bobSays(generalCh.id, 'Muted hello');
+  await settle();
+  check(!await ev(`return !!document.querySelector('.channel[data-channel-id="${generalCh.id}"] .channel-badge')`), "a muted person's message doesn't count as unread");
+
+  await p.click(`${bobLi} .collapsed-row .button`);
+  await p.waitFor(`document.querySelector('${bobLi} .text')?.textContent.includes('welcome')`, 'Show reveals the message');
+  check(await ev(`return document.activeElement === document.querySelector('${bobLi}')`), 'focus moves to the revealed message');
+  check(await ev(`return !!document.querySelector('${bobLi} .actions [aria-label="Unmute bob"]')`), 'a revealed message offers Unmute');
+
+  // The account dialog lists muted people, with Unmute.
+  await p.click('#account');
+  await p.waitFor(`document.querySelector('#account-dialog #muted-list')`, 'the account dialog');
+  check(/bob/.test(await text('#muted-list')), 'Account lists muted people', await text('#muted-list'));
+  await axe('account dialog with a muted person');
+  await p.click('#muted-list [aria-label="Unmute bob"]');
+  await p.waitFor(`/haven't muted anyone/.test(document.getElementById('muted-list').textContent)`, 'the list after unmuting');
+  check(true, 'Unmute in Account empties the list');
+  await p.key('Escape');
+  await settle();
+  check(!await ev(`return !!document.querySelector('#messages > li.collapsed')`), "after unmuting, bob's messages show in full");
+  await ev(`YapUI.toast.clear()`);
+
+  // Muting a channel: dimmed in the list, no unread count, only for you.
+  check(await text('#mute-channel') === 'Mute', 'the channel header has Mute');
+  await p.click('#mute-channel');
+  await p.waitFor(`document.getElementById('mute-channel').textContent === 'Unmute'`, 'the channel muted');
+  const mutedRow = await ev(`const b = document.querySelector('.channel[data-channel-id="${design.id}"]'); return { cls: b.classList.contains('channel--muted'), text: b.textContent }`);
+  check(mutedRow.cls && /, muted/.test(mutedRow.text), 'a muted channel is marked in the list, in words too', mutedRow);
+  await p.click(`.channel[data-channel-id="${generalCh.id}"]`);
+  await p.waitFor(`document.getElementById('channel-title').textContent === '# general'`, '#general');
+  await bobSays(design.id, 'Into a muted channel');
+  await settle();
+  check(!await ev(`return !!document.querySelector('.channel[data-channel-id="${design.id}"] .channel-badge')`), "a muted channel's messages don't count as unread");
+  await bobSays(generalCh.id, 'Not muted');
+  await p.waitFor(`document.title === 'Yap'`, 'the title (general is open)');
+  await p.click(`.channel[data-channel-id="${design.id}"]`);
+  await p.waitFor(`document.getElementById('channel-title').textContent === '# design'`, '#design again');
+  await axe('muted channel');
+  await p.mouseAway();
+  await shot('muted-channel-light');
+  await p.click('#mute-channel');
+  await p.waitFor(`document.getElementById('mute-channel').textContent === 'Mute'`, 'the channel unmuted');
+  check(!await ev(`return document.querySelector('.channel[data-channel-id="${design.id}"]').classList.contains('channel--muted')`), 'Unmute restores the channel');
+  await ev(`YapUI.toast.clear()`);
+  await settle();
+
   // ---- edit in place, and a message that's too long ----
 
   await p.hover(firstMsg);

@@ -23,7 +23,7 @@
   headButtons.className = 'call-buttons';
   headButtons.hidden = true;
   headButtons.append(startAudio, startVideo);
-  $('leave').before(headButtons);
+  $('mute-channel').before(headButtons);
 
   const banner = document.createElement('div');
   banner.className = 'call-banner';
