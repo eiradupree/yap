@@ -52,6 +52,7 @@ type Channel struct {
 	ID     int64  `json:"id"`
 	Name   string `json:"name"`
 	Joined bool   `json:"joined"`
+	Muted  bool   `json:"muted,omitempty"` // muted by the person asking; see mutes.go
 }
 
 type Message struct {
@@ -174,6 +175,22 @@ var migrations = []string{
 	 );
 	 CREATE INDEX attachments_message ON attachments(message_id);
 	 CREATE INDEX attachments_pending ON attachments(created_at) WHERE message_id IS NULL;`,
+
+	// Private mutes: people and channels each person has muted (mutes.go).
+	`CREATE TABLE muted_users (
+		user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		muted_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		created_at INTEGER NOT NULL,
+		PRIMARY KEY (user_id, muted_id)
+	 );
+	 CREATE INDEX muted_users_muted ON muted_users(muted_id);
+	 CREATE TABLE muted_channels (
+		user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+		created_at INTEGER NOT NULL,
+		PRIMARY KEY (user_id, channel_id)
+	 );
+	 CREATE INDEX muted_channels_channel ON muted_channels(channel_id);`,
 }
 
 func migrate(db *sql.DB) error {
@@ -404,9 +421,11 @@ func (s *Store) DeleteExpiredSessions(ctx context.Context) error {
 
 func (s *Store) ListChannels(ctx context.Context, userID int64) ([]Channel, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT c.id, c.name, m.user_id IS NOT NULL
-		FROM channels c LEFT JOIN members m ON m.channel_id = c.id AND m.user_id = ?
-		ORDER BY c.name`, userID)
+		SELECT c.id, c.name, m.user_id IS NOT NULL, mc.user_id IS NOT NULL
+		FROM channels c
+		LEFT JOIN members m ON m.channel_id = c.id AND m.user_id = ?
+		LEFT JOIN muted_channels mc ON mc.channel_id = c.id AND mc.user_id = ?
+		ORDER BY c.name`, userID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -414,7 +433,7 @@ func (s *Store) ListChannels(ctx context.Context, userID int64) ([]Channel, erro
 	chans := []Channel{}
 	for rows.Next() {
 		var c Channel
-		if err := rows.Scan(&c.ID, &c.Name, &c.Joined); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Joined, &c.Muted); err != nil {
 			return nil, err
 		}
 		chans = append(chans, c)

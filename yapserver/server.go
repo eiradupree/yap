@@ -136,6 +136,7 @@ func NewServer(store *Store, cfg Config) *Server {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "app": "yap"})
 	})
 	s.registerCalls()
+	s.registerMutes()
 	// Pages may connect only to this server and, for calls, the LiveKit server.
 	connect := append([]string{"'self'", "ws:", "wss:"}, cfg.LiveKit.origins()...)
 	s.csp = "default-src 'self'; connect-src " + strings.Join(connect, " ") +

@@ -90,6 +90,10 @@ body {
 .channel.active { background: var(--accent-soft); color: var(--accent-soft-foreground); font-weight: 600; }
 .channel.not-joined { color: var(--muted); }
 .channel.unread { font-weight: 700; }
+/* Muted: dimmed, with a crossed-out bell after the name. */
+.channel.channel--muted { color: var(--muted); }
+.channel.channel--muted.active { color: var(--accent-soft-foreground); }
+.channel .channel-muted-icon { display: inline-flex; }
 /* The unread count sits at the end of the row, not on a corner. */
 .channel .channel-badge { position: static; transform: none; margin-left: auto; border-color: transparent; }
 .new-channel { display: grid; gap: 4px; margin-top: 6px; }
@@ -127,6 +131,12 @@ body {
 .messages .edited { color: var(--muted); font-size: 12px; }
 .messages .text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .messages .empty { color: var(--muted); padding: 24px 20px; }
+.messages > li:focus { outline: none; }
+.messages > li:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+/* A muted person's message, collapsed to one line with Show. */
+.messages > li.collapsed { padding-bottom: 4px; }
+.messages .collapsed-row { display: flex; align-items: center; gap: 8px; min-height: 28px; font-size: 13px; }
+.messages .collapsed-icon { display: inline-flex; color: var(--muted); }
 .messages .empty:hover { background: none; }
 
 /* Hover toolbar: React, Reply, Edit, Delete. It stays while one of its
@@ -371,6 +381,8 @@ body {
 .account-section + .account-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--separator); }
 .account-form { display: grid; gap: 12px; }
 .member-list { list-style: none; margin: 0; padding: 0; }
+.account-note { margin: 0 0 8px; font-size: 13px; }
+.muted-list .muted-none { padding: 8px 0; }
 .member-list li {
   display: grid;
   grid-template-columns: auto 1fr auto;
